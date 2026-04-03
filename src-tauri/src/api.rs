@@ -17,6 +17,14 @@ struct OpenAIChatCompletion {
     created: i64,
     model: String,
     choices: Vec<Choice>,
+    usage: Usage,
+}
+
+#[derive(serde::Serialize)]
+struct Usage {
+    prompt_tokens: u32,
+    completion_tokens: u32,
+    total_tokens: u32,
 }
 
 #[derive(serde::Serialize)]
@@ -183,6 +191,11 @@ async fn chat_completions_handler(
                     },
                     finish_reason: "stop".to_string(),
                 }],
+                usage: Usage {
+                    prompt_tokens: 0,
+                    completion_tokens: 0,
+                    total_tokens: 0,
+                },
             };
             println!("=> [PromptProxy] Aiderへレスポンスを返却します");
             Json(completion).into_response()
@@ -201,6 +214,7 @@ pub async fn respond_to_llm_request(
     response: String,
     state: tauri::State<'_, AppState>,
 ) -> Result<(), String> {
+    println!("=> [PromptProxy] Reactから受信したテキスト: {}", response);
     if let Some(tx) = state.pending_requests.lock().await.remove(&request_id) {
         tx.send(response)
             .map_err(|_| "Failed to send response".to_string())
