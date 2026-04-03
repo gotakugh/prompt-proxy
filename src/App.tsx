@@ -3,7 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import "./App.css";
 
-type AppState = "idle" | "pending";
+type AppState = "init" | "idle" | "pending";
 
 interface PromptPayload {
   request_id: string;
@@ -12,7 +12,10 @@ interface PromptPayload {
 }
 
 function App() {
-  const [appState, setAppState] = useState<AppState>("idle");
+  const [appState, setAppState] = useState<AppState>("init");
+  const [targetDir, setTargetDir] = useState("");
+  const [files, setFiles] = useState("");
+  const [instruction, setInstruction] = useState("");
   const [promptData, setPromptData] = useState<PromptPayload | null>(null);
   const [aiResponse, setAiResponse] = useState("");
 
@@ -56,9 +59,53 @@ function App() {
     sendResponseToAider("Understood. No further changes needed.");
   };
 
+  const handleLaunchAider = async () => {
+    await invoke("launch_aider_batch", {
+      targetDir,
+      files,
+      message: instruction,
+    });
+    setAppState("idle");
+  };
+
   return (
     <main className="container">
       <h1>LLM Prompt Proxy</h1>
+
+      {appState === "init" && (
+        <div className="init-container">
+          <h2>Aider 起動</h2>
+          <div className="form-group">
+            <label>対象プロジェクトのディレクトリパス</label>
+            <input
+              type="text"
+              value={targetDir}
+              onChange={(e) => setTargetDir(e.target.value)}
+              placeholder="/path/to/your/project"
+            />
+          </div>
+          <div className="form-group">
+            <label>対象ファイル（複数ある場合はスペース区切り。空欄でも可）</label>
+            <input
+              type="text"
+              value={files}
+              onChange={(e) => setFiles(e.target.value)}
+              placeholder="src/main.rs src/lib.rs"
+            />
+          </div>
+          <div className="form-group">
+            <label>Aiderへの指示</label>
+            <textarea
+              value={instruction}
+              onChange={(e) => setInstruction(e.target.value)}
+              placeholder="〇〇のバグを直して..."
+            />
+          </div>
+          <button onClick={handleLaunchAider}>
+            Aiderをバックグラウンドで実行
+          </button>
+        </div>
+      )}
 
       {appState === "idle" && (
         <div className="idle-container">
