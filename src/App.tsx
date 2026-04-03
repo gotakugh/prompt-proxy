@@ -37,28 +37,9 @@ function App() {
 
   const handleReturnToAider = async () => {
     if (promptData?.request_id) {
-      // The backend expects a JSON string that can be parsed into a `Value`.
-      // We'll construct a mock OpenAI response object with the content from the textarea.
-      const responsePayload = {
-        id: `cmpl-${Date.now()}`,
-        object: "chat.completion",
-        created: Math.floor(Date.now() / 1000),
-        model: "gpt-proxy",
-        choices: [
-          {
-            index: 0,
-            message: {
-              role: "assistant",
-              content: aiResponse,
-            },
-            finish_reason: "stop",
-          },
-        ],
-      };
-
       await invoke("respond_to_llm_request", {
         requestId: promptData.request_id,
-        response: JSON.stringify(responsePayload),
+        response: aiResponse,
       });
 
       setAppState("idle");

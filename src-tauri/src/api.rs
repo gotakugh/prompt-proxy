@@ -1,12 +1,36 @@
-use axum::{extract::State, routing::post, Json, Router};
+use axum::{extract::State, response::IntoResponse, routing::post, Json, Router};
 use serde_json::{json, Value};
 use std::{collections::HashMap, fs, sync::Arc};
 use tauri::{AppHandle, Emitter, Manager};
+use time::OffsetDateTime;
 use tokio::sync::{oneshot, Mutex};
 use tower_http::cors::{Any, CorsLayer};
 use uuid::Uuid;
 
 type ResponderTx = oneshot::Sender<String>;
+
+// OpenAI-compatible response structures
+#[derive(serde::Serialize)]
+struct OpenAIChatCompletion {
+    id: String,
+    object: String,
+    created: i64,
+    model: String,
+    choices: Vec<Choice>,
+}
+
+#[derive(serde::Serialize)]
+struct Choice {
+    index: u32,
+    message: Message,
+    finish_reason: String,
+}
+
+#[derive(serde::Serialize)]
+struct Message {
+    role: String,
+    content: String,
+}
 
 // This state will be managed by Tauri and accessible from both
 // the Axum handlers and Tauri commands.
@@ -17,7 +41,7 @@ pub struct AppState {
 async fn chat_completions_handler(
     State(app_handle): State<AppHandle>,
     Json(payload): Json<Value>,
-) -> Json<Value> {
+) -> impl IntoResponse {
     let request_id = Uuid::new_v4().to_string();
     let (tx, rx) = oneshot::channel::<String>();
 
@@ -32,7 +56,10 @@ async fn chat_completions_handler(
     // 1. Parse OpenAI JSON and separate context from user instruction
     let messages = match payload.get("messages").and_then(|m| m.as_array()) {
         Some(m) => m,
-        None => return Json(json!({"error": "messages field is missing or not an array"})),
+        None => {
+            return Json(json!({"error": "messages field is missing or not an array"}))
+                .into_response()
+        }
     };
 
     let last_user_message_index =
@@ -41,7 +68,7 @@ async fn chat_completions_handler(
             .rposition(|m| m.get("role").and_then(|r| r.as_str()) == Some("user"))
         {
             Some(i) => i,
-            None => return Json(json!({"error": "No user message found in messages"})),
+            None => return Json(json!({"error": "No user message found in messages"})).into_response(),
         };
 
     let user_instruction = messages[last_user_message_index]
@@ -95,17 +122,20 @@ async fn chat_completions_handler(
 
     let temp_dir = match app_handle.path().temp_dir() {
         Ok(path) => path,
-        Err(_) => return Json(json!({"error": "Could not resolve temp directory"})),
+        Err(_) => {
+            return Json(json!({"error": "Could not resolve temp directory"})).into_response()
+        }
     };
     let temp_path = temp_dir.join("context.xml");
 
     if let Err(e) = fs::write(&temp_path, xml_string) {
-        return Json(json!({ "error": format!("Failed to write context.xml: {}", e)}));
+        return Json(json!({ "error": format!("Failed to write context.xml: {}", e)}))
+            .into_response();
     }
 
     let context_file_path = match temp_path.to_str() {
         Some(s) => s.to_string(),
-        None => return Json(json!({"error": "Temp path contains invalid UTF-8"})),
+        None => return Json(json!({"error": "Temp path contains invalid UTF-8"})).into_response(),
     };
 
     // 3. Create final prompt
@@ -133,11 +163,26 @@ async fn chat_completions_handler(
 
     // Wait for the frontend to respond via the `respond_to_llm_request` command
     match rx.await {
-        Ok(response_body) => match serde_json::from_str(&response_body) {
-            Ok(json_value) => Json(json_value),
-            Err(_) => Json(json!({"error": "Failed to parse JSON response from frontend"})),
-        },
-        Err(_) => Json(json!({ "error": "Internal error: oneshot channel was closed" })),
+        Ok(response_content) => {
+            let completion = OpenAIChatCompletion {
+                id: "chatcmpl-dummy".to_string(),
+                object: "chat.completion".to_string(),
+                created: OffsetDateTime::now_utc().unix_timestamp(),
+                model: "gpt-4o".to_string(),
+                choices: vec![Choice {
+                    index: 0,
+                    message: Message {
+                        role: "assistant".to_string(),
+                        content: response_content,
+                    },
+                    finish_reason: "stop".to_string(),
+                }],
+            };
+            Json(completion).into_response()
+        }
+        Err(_) => {
+            Json(json!({ "error": "Internal error: oneshot channel was closed" })).into_response()
+        }
     }
 }
 
