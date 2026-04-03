@@ -1,49 +1,112 @@
-import { useState } from "react";
-import reactLogo from "./assets/react.svg";
+import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import "./App.css";
 
-function App() {
-  const [greetMsg, setGreetMsg] = useState("");
-  const [name, setName] = useState("");
+type AppState = "idle" | "pending";
 
-  async function greet() {
-    // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
-    setGreetMsg(await invoke("greet", { name }));
-  }
+interface PromptPayload {
+  request_id: string;
+  context_file_path: string;
+  prompt: string;
+}
+
+function App() {
+  const [appState, setAppState] = useState<AppState>("idle");
+  const [promptData, setPromptData] = useState<PromptPayload | null>(null);
+  const [aiResponse, setAiResponse] = useState("");
+
+  useEffect(() => {
+    const unlisten = listen<PromptPayload>("prompt_received", (event) => {
+      setPromptData(event.payload);
+      setAiResponse(""); // Clear previous response
+      setAppState("pending");
+    });
+    return () => {
+      unlisten.then((fn) => fn());
+    };
+  }, []);
+
+  const handleCopyToClipboard = () => {
+    if (promptData?.prompt) {
+      navigator.clipboard.writeText(promptData.prompt).catch((err) => {
+        console.error("Failed to copy text: ", err);
+      });
+    }
+  };
+
+  const handleReturnToAider = async () => {
+    if (promptData?.request_id) {
+      // The backend expects a JSON string that can be parsed into a `Value`.
+      // We'll construct a mock OpenAI response object with the content from the textarea.
+      const responsePayload = {
+        id: `cmpl-${Date.now()}`,
+        object: "chat.completion",
+        created: Math.floor(Date.now() / 1000),
+        model: "gpt-proxy",
+        choices: [
+          {
+            index: 0,
+            message: {
+              role: "assistant",
+              content: aiResponse,
+            },
+            finish_reason: "stop",
+          },
+        ],
+      };
+
+      await invoke("respond_to_llm_request", {
+        requestId: promptData.request_id,
+        response: JSON.stringify(responsePayload),
+      });
+
+      setAppState("idle");
+      setPromptData(null);
+      setAiResponse("");
+    }
+  };
 
   return (
     <main className="container">
-      <h1>Welcome to Tauri + React</h1>
+      <h1>LLM Prompt Proxy</h1>
 
-      <div className="row">
-        <a href="https://vite.dev" target="_blank">
-          <img src="/vite.svg" className="logo vite" alt="Vite logo" />
-        </a>
-        <a href="https://tauri.app" target="_blank">
-          <img src="/tauri.svg" className="logo tauri" alt="Tauri logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <p>Click on the Tauri, Vite, and React logos to learn more.</p>
+      {appState === "idle" && (
+        <div className="idle-container">
+          <h2>待機中 (Idle)</h2>
+          <p>Aiderからのリクエストを待っています...</p>
+        </div>
+      )}
 
-      <form
-        className="row"
-        onSubmit={(e) => {
-          e.preventDefault();
-          greet();
-        }}
-      >
-        <input
-          id="greet-input"
-          onChange={(e) => setName(e.currentTarget.value)}
-          placeholder="Enter a name..."
-        />
-        <button type="submit">Greet</button>
-      </form>
-      <p>{greetMsg}</p>
+      {appState === "pending" && promptData && (
+        <div className="pending-container">
+          <h2>入力待ち (Pending)</h2>
+
+          <div className="info-box">
+            <h3>コンテキストファイル</h3>
+            <p>このファイルをブラウザに添付してください:</p>
+            <code>{promptData.context_file_path}</code>
+          </div>
+
+          <div className="info-box">
+            <h3>プロンプト</h3>
+            <div className="prompt-display">
+              <pre>{promptData.prompt}</pre>
+              <button onClick={handleCopyToClipboard}>コピー</button>
+            </div>
+          </div>
+
+          <div className="response-box">
+            <h3>AIからの返答 (SEARCH/REPLACE)</h3>
+            <textarea
+              value={aiResponse}
+              onChange={(e) => setAiResponse(e.target.value)}
+              placeholder="ここにAIの返答を貼り付けてください..."
+            />
+            <button onClick={handleReturnToAider}>Aiderに返す</button>
+          </div>
+        </div>
+      )}
     </main>
   );
 }
