@@ -35,17 +35,25 @@ function App() {
     }
   };
 
-  const handleReturnToAider = async () => {
+  const sendResponseToAider = async (response: string) => {
     if (promptData?.request_id) {
       await invoke("respond_to_llm_request", {
         requestId: promptData.request_id,
-        response: aiResponse,
+        response,
       });
 
       setAppState("idle");
       setPromptData(null);
       setAiResponse("");
     }
+  };
+
+  const handleReturnToAider = () => {
+    sendResponseToAider(aiResponse);
+  };
+
+  const handleSkip = () => {
+    sendResponseToAider("Understood. No further changes needed.");
   };
 
   return (
@@ -84,7 +92,10 @@ function App() {
               onChange={(e) => setAiResponse(e.target.value)}
               placeholder="ここにAIの返答を貼り付けてください..."
             />
-            <button onClick={handleReturnToAider}>Aiderに返す</button>
+            <div className="button-group">
+              <button onClick={handleReturnToAider}>Aiderに返す</button>
+              <button onClick={handleSkip}>スキップして適当に返す</button>
+            </div>
           </div>
         </div>
       )}
