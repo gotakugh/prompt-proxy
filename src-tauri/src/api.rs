@@ -42,6 +42,7 @@ async fn chat_completions_handler(
     State(app_handle): State<AppHandle>,
     Json(payload): Json<Value>,
 ) -> impl IntoResponse {
+    println!("=> [PromptProxy] リクエストを受信しました");
     let request_id = Uuid::new_v4().to_string();
     let (tx, rx) = oneshot::channel::<String>();
 
@@ -144,6 +145,8 @@ async fn chat_completions_handler(
         user_instruction
     );
 
+    println!("=> [PromptProxy] XMLとプロンプトの生成が完了しました");
+
     // 4. Emit data to frontend
     #[derive(Clone, serde::Serialize)]
     struct PromptPayload<'a> {
@@ -161,9 +164,12 @@ async fn chat_completions_handler(
         .emit("prompt_received", &prompt_payload)
         .unwrap();
 
+    println!("=> [PromptProxy] フロントエンドにイベントを送信し、待機を開始します...");
+
     // Wait for the frontend to respond via the `respond_to_llm_request` command
     match rx.await {
         Ok(response_content) => {
+            println!("=> [PromptProxy] フロントエンドから返答を受け取りました");
             let completion = OpenAIChatCompletion {
                 id: "chatcmpl-dummy".to_string(),
                 object: "chat.completion".to_string(),
@@ -178,9 +184,11 @@ async fn chat_completions_handler(
                     finish_reason: "stop".to_string(),
                 }],
             };
+            println!("=> [PromptProxy] Aiderへレスポンスを返却します");
             Json(completion).into_response()
         }
         Err(_) => {
+            println!("=> [PromptProxy] Error: oneshot channel was closed before receiving a response.");
             Json(json!({ "error": "Internal error: oneshot channel was closed" })).into_response()
         }
     }
