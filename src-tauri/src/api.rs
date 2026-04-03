@@ -94,8 +94,8 @@ async fn chat_completions_handler(
     );
 
     let temp_dir = match app_handle.path().temp_dir() {
-        Some(path) => path,
-        None => return Json(json!({"error": "Could not resolve temp directory"})),
+        Ok(path) => path,
+        Err(_) => return Json(json!({"error": "Could not resolve temp directory"})),
     };
     let temp_path = temp_dir.join("context.xml");
 
