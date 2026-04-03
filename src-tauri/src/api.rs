@@ -1,6 +1,6 @@
 use axum::{extract::State, routing::post, Json, Router};
 use serde_json::{json, Value};
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::HashMap, fs, sync::Arc};
 use tauri::{AppHandle, Emitter, Manager};
 use tokio::sync::{oneshot, Mutex};
 use tower_http::cors::{Any, CorsLayer};
@@ -29,9 +29,106 @@ async fn chat_completions_handler(
         .await
         .insert(request_id.clone(), tx);
 
-    // Emit an event to the frontend with the request payload and a unique ID
+    // 1. Parse OpenAI JSON and separate context from user instruction
+    let messages = match payload.get("messages").and_then(|m| m.as_array()) {
+        Some(m) => m,
+        None => return Json(json!({"error": "messages field is missing or not an array"})),
+    };
+
+    let last_user_message_index =
+        match messages
+            .iter()
+            .rposition(|m| m.get("role").and_then(|r| r.as_str()) == Some("user"))
+        {
+            Some(i) => i,
+            None => return Json(json!({"error": "No user message found in messages"})),
+        };
+
+    let user_instruction = messages[last_user_message_index]
+        .get("content")
+        .and_then(|c| c.as_str())
+        .unwrap_or("")
+        .to_string();
+
+    let context_content: String = messages[..last_user_message_index]
+        .iter()
+        .filter_map(|msg| msg.get("content").and_then(|c| c.as_str()))
+        .collect::<Vec<_>>()
+        .join("\n");
+
+    // 2. Extract context and format as Repomix-style XML
+    let mut repo_info = String::new();
+    let mut files_xml = String::new();
+    let mut lines = context_content.lines().peekable();
+
+    while let Some(line) = lines.next() {
+        let is_potential_path = !line.trim().is_empty() && !line.starts_with(' ');
+        if is_potential_path {
+            if let Some(next_line) = lines.peek() {
+                if next_line.starts_with("```") {
+                    let path = line.trim();
+                    lines.next(); // Consume ```
+                    let mut code = String::new();
+                    for code_line in lines.by_ref() {
+                        if code_line.starts_with("```") {
+                            break;
+                        }
+                        code.push_str(code_line);
+                        code.push('\n');
+                    }
+                    files_xml.push_str(&format!(
+                        "<file path=\"{}\"><![CDATA[{}]]></file>\n",
+                        path, code
+                    ));
+                    continue;
+                }
+            }
+        }
+        repo_info.push_str(line);
+        repo_info.push('\n');
+    }
+
+    let xml_string = format!(
+        "<repository><![CDATA[{}]]></repository>\n{}",
+        repo_info, files_xml
+    );
+
+    let temp_dir = match app_handle.path().temp_dir() {
+        Some(path) => path,
+        None => return Json(json!({"error": "Could not resolve temp directory"})),
+    };
+    let temp_path = temp_dir.join("context.xml");
+
+    if let Err(e) = fs::write(&temp_path, xml_string) {
+        return Json(json!({ "error": format!("Failed to write context.xml: {}", e)}));
+    }
+
+    let context_file_path = match temp_path.to_str() {
+        Some(s) => s.to_string(),
+        None => return Json(json!({"error": "Temp path contains invalid UTF-8"})),
+    };
+
+    // 3. Create final prompt
+    let final_prompt = format!(
+        "{}\n\n【重要】出力は挨拶や解説を一切省き、SEARCH/REPLACEブロックのみを使用すること。",
+        user_instruction
+    );
+
+    // 4. Emit data to frontend
+    #[derive(Clone, serde::Serialize)]
+    struct PromptPayload<'a> {
+        request_id: &'a str,
+        context_file_path: &'a str,
+        prompt: &'a str,
+    }
+    let prompt_payload = PromptPayload {
+        request_id: &request_id,
+        context_file_path: &context_file_path,
+        prompt: &final_prompt,
+    };
+
     app_handle
-        .emit("new-llm-request", (&request_id, &payload))
+        .emit("prompt_received", &prompt_payload)
         .unwrap();
 
     // Wait for the frontend to respond via the `respond_to_llm_request` command
