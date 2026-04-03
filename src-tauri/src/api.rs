@@ -1,7 +1,7 @@
 use axum::{extract::State, routing::post, Json, Router};
 use serde_json::{json, Value};
 use std::{collections::HashMap, sync::Arc};
-use tauri::{AppHandle, Manager};
+use tauri::{AppHandle, Emitter, Manager};
 use tokio::sync::{oneshot, Mutex};
 use tower_http::cors::{Any, CorsLayer};
 use uuid::Uuid;
