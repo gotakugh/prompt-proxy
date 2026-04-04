@@ -87,7 +87,7 @@ function App() {
       try {
         await startDrag({
           item: [promptData.context_file_path],
-          image: promptData.icon_file_path,
+          icon: promptData.icon_file_path,
         });
       } catch (error) {
         console.error("Drag failed:", error);
