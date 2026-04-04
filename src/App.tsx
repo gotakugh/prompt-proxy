@@ -10,6 +10,7 @@ type AppState = "init" | "idle" | "pending";
 interface PromptPayload {
   request_id: string;
   context_file_path: string;
+  icon_file_path: string;
   prompt: string;
 }
 
@@ -82,10 +83,11 @@ function App() {
 
   const handleDragFile = async (e: DragEvent<HTMLDivElement>) => {
     e.preventDefault();
-    if (promptData?.context_file_path) {
+    if (promptData?.context_file_path && promptData?.icon_file_path) {
       try {
         await startDrag({
           item: [promptData.context_file_path],
+          image: promptData.icon_file_path,
         });
       } catch (error) {
         console.error("Drag failed:", error);

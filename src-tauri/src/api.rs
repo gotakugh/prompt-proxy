@@ -141,6 +141,11 @@ async fn chat_completions_handler(
             .into_response();
     }
 
+    // Use the app icon for the drag preview icon
+    let icon_bytes: &[u8] = include_bytes!("../icons/icon.png");
+    let icon_path = temp_dir.join("icon.png");
+    let _ = std::fs::write(&icon_path, icon_bytes);
+
     // Ensure the path is absolute for the OS drag API to work correctly.
     let absolute_path = match std::fs::canonicalize(&temp_path) {
         Ok(path) => path,
@@ -161,6 +166,23 @@ async fn chat_completions_handler(
         context_file_path = context_file_path.replace("\\\\?\\", "");
     }
 
+    let absolute_icon_path = match std::fs::canonicalize(&icon_path) {
+        Ok(path) => path,
+        Err(e) => {
+            return Json(
+                json!({ "error": format!("Failed to get absolute path for icon.png: {}", e)}),
+            )
+            .into_response()
+        }
+    };
+    let mut icon_file_path = match absolute_icon_path.to_str() {
+        Some(s) => s.to_string(),
+        None => return Json(json!({"error": "Icon path contains invalid UTF-8"})).into_response(),
+    };
+    if icon_file_path.starts_with("\\\\?\\") {
+        icon_file_path = icon_file_path.replace("\\\\?\\", "");
+    }
+
     // 3. Create final prompt
     let final_prompt = format!(
         "{}\n\n【重要】出力は挨拶や解説を一切省き、SEARCH/REPLACEブロックのみを使用すること。",
@@ -174,11 +196,13 @@ async fn chat_completions_handler(
     struct PromptPayload<'a> {
         request_id: &'a str,
         context_file_path: &'a str,
+        icon_file_path: &'a str,
         prompt: &'a str,
     }
     let prompt_payload = PromptPayload {
         request_id: &request_id,
         context_file_path: &context_file_path,
+        icon_file_path: &icon_file_path,
         prompt: &final_prompt,
     };
 
