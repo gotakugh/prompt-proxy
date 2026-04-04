@@ -3,6 +3,7 @@ use std::process::{Child, Command};
 use std::sync::Mutex;
 use std::thread;
 use std::time::Duration;
+use tauri::Manager;
 
 struct AiderProcessState(Mutex<Vec<Child>>);
 
