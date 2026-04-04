@@ -187,29 +187,34 @@ button {
 }
 
 .draggable-file {
-  cursor: grab;
   display: inline-flex;
+  flex-direction: column;
   align-items: center;
-  gap: 10px;
-  padding: 12px 20px;
-  border: 1px solid #ccc;
-  border-radius: 8px;
-  background-color: #ffffff;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-  width: fit-content;
-  transition: transform 0.1s, box-shadow 0.1s;
-  color: #0f0f0f;
+  gap: 8px;
+  padding: 12px;
+  width: 100px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background-color: transparent;
+  box-shadow: none;
+  cursor: grab;
+  transition: background-color 0.1s, border-color 0.1s;
 }
-
 .draggable-file:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+  background-color: rgba(0, 0, 0, 0.05);
+  border-color: rgba(0, 0, 0, 0.1);
+  transform: none;
+  box-shadow: none;
 }
-
 .draggable-file:active {
   cursor: grabbing;
-  transform: translateY(0);
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  background-color: rgba(0, 0, 0, 0.1);
+}
+.file-name {
+  font-size: 0.9em;
+  color: #333;
+  text-align: center;
+  word-break: break-all;
 }
 
 .draggable-file-wrapper {
@@ -282,8 +287,15 @@ button {
   }
 
   .draggable-file {
-    background-color: #2a2a2a;
-    border-color: #555;
-    color: #f6f6f6;
+    background-color: transparent;
+    border-color: transparent;
   }
+  .draggable-file:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.2);
+  }
+  .draggable-file:active {
+    background-color: rgba(255, 255, 255, 0.15);
+  }
+  .file-name { color: #f6f6f6; }
 }

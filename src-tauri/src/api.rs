@@ -142,9 +142,9 @@ async fn chat_completions_handler(
     }
 
     // Use the app icon for the drag preview icon
-    let icon_bytes: &[u8] = include_bytes!("../icons/icon.png");
+    let transparent_png: &[u8] = &[137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82, 0, 0, 0, 1, 0, 0, 0, 1, 8, 6, 0, 0, 0, 31, 21, 196, 137, 0, 0, 0, 11, 73, 68, 65, 84, 8, 215, 99, 96, 0, 2, 0, 0, 5, 0, 1, 226, 38, 5, 155, 0, 0, 0, 0, 73, 69, 78, 68, 174, 66, 96, 130];
     let icon_path = temp_dir.join("icon.png");
-    let _ = std::fs::write(&icon_path, icon_bytes);
+    let _ = std::fs::write(&icon_path, transparent_png);
 
     // Ensure the path is absolute for the OS drag API to work correctly.
     let absolute_path = match std::fs::canonicalize(&temp_path) {

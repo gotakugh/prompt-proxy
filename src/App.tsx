@@ -156,7 +156,12 @@ function App() {
                 draggable={true}
                 onDragStart={handleDragFile}
               >
-                📄 掴んでブラウザへドロップ (context.xml)
+                <svg width="64" height="80" viewBox="0 0 100 120" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M0 4C0 1.8 1.8 0 4 0H65L100 35V116C100 118.2 98.2 120 96 120H4C1.8 120 0 118.2 0 116V4Z" fill="#CF84E1" />
+                  <path d="M65 0V31C65 33.2 66.8 35 69 35H100L65 0Z" fill="#B463C8" />
+                  <text x="50" y="78" fill="white" fontSize="36" fontFamily="monospace" textAnchor="middle" fontWeight="bold">&lt;/&gt;</text>
+                </svg>
+                <span className="file-name">context.xml</span>
               </div>
             </div>
           </div>
