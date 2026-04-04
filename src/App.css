@@ -151,6 +151,15 @@ button {
   box-sizing: border-box;
 }
 
+.input-group {
+  display: flex;
+  gap: 0.5em;
+}
+
+.input-group input {
+  flex: 1;
+}
+
 .idle-container, .pending-container {
   width: 100%;
   max-width: 800px;

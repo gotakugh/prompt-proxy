@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import { open } from "@tauri-apps/plugin-dialog";
 import "./App.css";
 
 type AppState = "init" | "idle" | "pending";
@@ -59,6 +60,16 @@ function App() {
     sendResponseToAider("Understood. No further changes needed.");
   };
 
+  const handleSelectDirectory = async () => {
+    const selected = await open({
+      directory: true,
+      multiple: false,
+    });
+    if (typeof selected === "string") {
+      setTargetDir(selected);
+    }
+  };
+
   const handleLaunchAider = async () => {
     await invoke("launch_aider_batch", {
       targetDir,
@@ -77,12 +88,15 @@ function App() {
           <h2>Aider 起動</h2>
           <div className="form-group">
             <label>対象プロジェクトのディレクトリパス</label>
-            <input
-              type="text"
-              value={targetDir}
-              onChange={(e) => setTargetDir(e.target.value)}
-              placeholder="/path/to/your/project"
-            />
+            <div className="input-group">
+              <input
+                type="text"
+                value={targetDir}
+                onChange={(e) => setTargetDir(e.target.value)}
+                placeholder="/path/to/your/project"
+              />
+              <button onClick={handleSelectDirectory}>フォルダを選択</button>
+            </div>
           </div>
           <div className="form-group">
             <label>対象ファイル（複数ある場合はスペース区切り。空欄でも可）</label>
