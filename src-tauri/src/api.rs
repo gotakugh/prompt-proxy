@@ -134,6 +134,14 @@ async fn chat_completions_handler(
             return Json(json!({"error": "Could not resolve temp directory"})).into_response()
         }
     };
+
+    let payload_str = serde_json::to_string_pretty(&payload.0).unwrap();
+    let json_path = temp_dir.join("aider_payload.json");
+    if let Err(e) = fs::write(&json_path, payload_str) {
+        return Json(json!({ "error": format!("Failed to write aider_payload.json: {}", e)}))
+            .into_response();
+    }
+
     let temp_path = temp_dir.join("context.xml");
 
     if let Err(e) = fs::write(&temp_path, xml_string) {
@@ -183,6 +191,23 @@ async fn chat_completions_handler(
         icon_file_path = icon_file_path.replace("\\\\?\\", "");
     }
 
+    let absolute_json_path = match std::fs::canonicalize(&json_path) {
+        Ok(path) => path,
+        Err(e) => {
+            return Json(
+                json!({ "error": format!("Failed to get absolute path for aider_payload.json: {}", e)}),
+            )
+            .into_response()
+        }
+    };
+    let mut json_file_path = match absolute_json_path.to_str() {
+        Some(s) => s.to_string(),
+        None => return Json(json!({"error": "JSON path contains invalid UTF-8"})).into_response(),
+    };
+    if json_file_path.starts_with("\\\\?\\") {
+        json_file_path = json_file_path.replace("\\\\?\\", "");
+    }
+
     // 3. Create final prompt
     let final_prompt = format!(
         "{}\n\n【重要】出力は挨拶や解説を一切省き、SEARCH/REPLACEブロックのみを使用すること。",
@@ -197,12 +222,14 @@ async fn chat_completions_handler(
         request_id: &'a str,
         context_file_path: &'a str,
         icon_file_path: &'a str,
+        json_file_path: &'a str,
         prompt: &'a str,
     }
     let prompt_payload = PromptPayload {
         request_id: &request_id,
         context_file_path: &context_file_path,
         icon_file_path: &icon_file_path,
+        json_file_path: &json_file_path,
         prompt: &final_prompt,
     };
 

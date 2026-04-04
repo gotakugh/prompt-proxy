@@ -217,6 +217,50 @@ button {
   word-break: break-all;
 }
 
+.debug-toggle-wrapper {
+  text-align: center;
+  margin-top: 2em;
+  padding-bottom: 1em;
+}
+
+.debug-toggle-button {
+  background-color: transparent;
+  border: 1px solid #888;
+  color: #888;
+  box-shadow: none;
+}
+.debug-toggle-button:hover {
+  background-color: rgba(0, 0, 0, 0.05);
+  border-color: #555;
+}
+
+.debug-container {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 0 1em;
+  display: flex;
+  gap: 1em;
+  align-items: flex-start;
+}
+
+.terminal-log {
+  flex: 1;
+  background-color: #1e1e1e;
+  color: #4af626;
+  font-family: monospace;
+  padding: 10px;
+  border-radius: 6px;
+  height: 150px;
+  overflow-y: auto;
+  text-align: left;
+  margin-bottom: 1em;
+  white-space: pre-wrap;
+}
+
+.debug-files {
+  padding-top: 0.5em;
+}
+
 .draggable-file-wrapper {
   text-align: center;
   padding: 0.5em 0;
@@ -298,4 +342,13 @@ button {
     background-color: rgba(255, 255, 255, 0.15);
   }
   .file-name { color: #f6f6f6; }
+
+  .debug-toggle-button {
+    color: #aaa;
+    border-color: #aaa;
+  }
+  .debug-toggle-button:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+    border-color: #ccc;
+  }
 }

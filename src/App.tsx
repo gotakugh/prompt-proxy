@@ -11,6 +11,7 @@ interface PromptPayload {
   request_id: string;
   context_file_path: string;
   icon_file_path: string;
+  json_file_path: string;
   prompt: string;
 }
 
@@ -21,9 +22,12 @@ function App() {
   const [instruction, setInstruction] = useState("");
   const [promptData, setPromptData] = useState<PromptPayload | null>(null);
   const [aiResponse, setAiResponse] = useState("");
+  const [showDebug, setShowDebug] = useState(false);
+  const [logs, setLogs] = useState<string[]>([]);
 
   useEffect(() => {
     const unlisten = listen<PromptPayload>("prompt_received", (event) => {
+      setLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] ⬇️ Aiderからのリクエストを受信しました`]);
       setPromptData(event.payload);
       setAiResponse(""); // Clear previous response
       setAppState("pending");
@@ -43,6 +47,7 @@ function App() {
 
   const sendResponseToAider = async (response: string) => {
     if (promptData?.request_id) {
+      setLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] ⬆️ Aiderへレスポンスを送信しました`]);
       await invoke("respond_to_llm_request", {
         requestId: promptData.request_id,
         response,
@@ -87,6 +92,20 @@ function App() {
       try {
         await startDrag({
           item: [promptData.context_file_path],
+          icon: promptData.icon_file_path,
+        });
+      } catch (error) {
+        console.error("Drag failed:", error);
+      }
+    }
+  };
+
+  const handleDragJsonFile = async (e: DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    if (promptData?.json_file_path && promptData?.icon_file_path) {
+      try {
+        await startDrag({
+          item: [promptData.json_file_path],
           icon: promptData.icon_file_path,
         });
       } catch (error) {
@@ -186,6 +205,38 @@ function App() {
               <button onClick={handleSkip}>スキップして適当に返す</button>
             </div>
           </div>
+        </div>
+      )}
+
+      <div className="debug-toggle-wrapper">
+        <button className="debug-toggle-button" onClick={() => setShowDebug(!showDebug)}>
+          🛠️ デバッグ / 通信ログを表示
+        </button>
+      </div>
+
+      {showDebug && (
+        <div className="debug-container">
+          <div className="terminal-log">
+            {logs.map((log, index) => (
+              <div key={index}>{log}</div>
+            ))}
+          </div>
+          {promptData && (
+            <div className="debug-files">
+              <div
+                className="draggable-file"
+                draggable={true}
+                onDragStart={handleDragJsonFile}
+              >
+                <svg width="64" height="80" viewBox="0 0 100 120" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M0 4C0 1.8 1.8 0 4 0H65L100 35V116C100 118.2 98.2 120 96 120H4C1.8 120 0 118.2 0 116V4Z" fill="#84A8E1" />
+                  <path d="M65 0V31C65 33.2 66.8 35 69 35H100L65 0Z" fill="#6388C8" />
+                  <text x="50" y="82" fill="white" fontSize="30" fontFamily="monospace" textAnchor="middle" fontWeight="bold">JSON</text>
+                </svg>
+                <span className="file-name">aider_payload.json</span>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </main>
