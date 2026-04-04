@@ -26,9 +26,49 @@ function App() {
   const [logs, setLogs] = useState<string[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
+  // Settings states
+  const [showSettings, setShowSettings] = useState(false);
+  const [useCustomPrompt, setUseCustomPrompt] = useState(false);
+  const [customEditPrompt, setCustomEditPrompt] = useState(
+    "添付された context.xml を読み込み、コンテキストを理解した上で、以下の指示に従ってコードを修正してください。\n\n=== 指示内容 ===\n{instruction}\n================\n\n【重要】出力は挨拶や解説を一切省き、SEARCH/REPLACEブロックのみを使用すること。"
+  );
+  const [customAskPrompt, setCustomAskPrompt] = useState(
+    "添付された context.xml を読み込み、リポジトリのコンテキストを理解した上で、以下の質問に回答してください。\n\n=== 質問 ===\n{instruction}\n=============="
+  );
+
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [logs]);
+
+  // Load settings on mount
+  useEffect(() => {
+    const savedSettings = localStorage.getItem("promptSettings");
+    if (savedSettings) {
+      try {
+        const settings = JSON.parse(savedSettings);
+        setUseCustomPrompt(settings.useCustomPrompt ?? false);
+        setCustomEditPrompt(settings.customEditPrompt ?? "");
+        setCustomAskPrompt(settings.customAskPrompt ?? "");
+      } catch (e) {
+        console.error("Failed to parse settings from localStorage", e);
+      }
+    }
+  }, []);
+
+  // Sync settings with backend and save to localStorage on change
+  useEffect(() => {
+    const settingsToSave = { useCustomPrompt, customEditPrompt, customAskPrompt };
+    localStorage.setItem("promptSettings", JSON.stringify(settingsToSave));
+
+    const settingsForRust = {
+      use_custom: useCustomPrompt,
+      custom_edit_prompt: customEditPrompt,
+      custom_ask_prompt: customAskPrompt,
+    };
+    invoke("update_prompt_settings", { settings: settingsForRust }).catch(
+      console.error
+    );
+  }, [useCustomPrompt, customEditPrompt, customAskPrompt]);
 
   useEffect(() => {
     const unlisten = listen<PromptPayload>("prompt_received", (event) => {
@@ -161,11 +201,62 @@ function App() {
     <main className="app-layout">
       {/* 左側：メインの操作領域 */}
       <div className="main-pane">
-        <h1>LLM Prompt Proxy</h1>
+        <div className="main-header">
+          <h1>LLM Prompt Proxy</h1>
+          <button className="settings-button" onClick={() => setShowSettings(true)}>⚙️ 設定</button>
+        </div>
 
-        {appState === "init" && (
-          <div className="init-container">
-            <h2>Aider 起動</h2>
+        {showSettings ? (
+          <div className="settings-container">
+            <h2>プロンプト設定</h2>
+            <div className="form-group">
+              <div className="mode-selector">
+                <label>
+                  <input
+                    type="radio"
+                    checked={!useCustomPrompt}
+                    onChange={() => setUseCustomPrompt(false)}
+                  />
+                  ツールのデフォルト設定を使用
+                </label>
+                <label>
+                  <input
+                    type="radio"
+                    checked={useCustomPrompt}
+                    onChange={() => setUseCustomPrompt(true)}
+                  />
+                  カスタムプロンプトを使用
+                </label>
+              </div>
+            </div>
+
+            {useCustomPrompt && (
+              <>
+                <div className="form-group">
+                  <label>コード修正(Edit)用プロンプト</label>
+                  <textarea
+                    value={customEditPrompt}
+                    onChange={(e) => setCustomEditPrompt(e.target.value)}
+                  />
+                  <p className="prompt-hint">※ユーザーの指示は {`{instruction}`} の部分に挿入されます</p>
+                </div>
+                <div className="form-group">
+                  <label>リポジトリ質問(Ask)用プロンプト</label>
+                  <textarea
+                    value={customAskPrompt}
+                    onChange={(e) => setCustomAskPrompt(e.target.value)}
+                  />
+                  <p className="prompt-hint">※ユーザーの指示は {`{instruction}`} の部分に挿入されます</p>
+                </div>
+              </>
+            )}
+            <button onClick={() => setShowSettings(false)}>設定を閉じる</button>
+          </div>
+        ) : (
+          <>
+            {appState === "init" && (
+              <div className="init-container">
+                <h2>Aider 起動</h2>
             <div className="form-group">
               <label>対象プロジェクトのディレクトリパス</label>
               <div className="input-group">
@@ -274,6 +365,8 @@ function App() {
               </div>
             </div>
           </div>
+        )}
+          </>
         )}
       </div>
 

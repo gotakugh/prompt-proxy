@@ -58,6 +58,31 @@ a:hover {
 h1 {
   text-align: center;
   margin-top: 0;
+  margin-bottom: 0;
+}
+
+.main-header {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 0.5em;
+  position: relative;
+  margin-bottom: 2em;
+}
+
+.settings-button {
+  font-size: 1.5rem;
+  padding: 0.2rem 0.4rem;
+  background: transparent;
+  border: 1px solid transparent;
+  box-shadow: none;
+  border-radius: 6px;
+  line-height: 1;
+}
+
+.settings-button:hover {
+  background-color: rgba(0, 0, 0, 0.1);
+  border-color: transparent;
 }
 
 input,
@@ -200,6 +225,27 @@ button {
 .mode-selector input {
   width: auto !important; /* Override .form-group input */
   box-shadow: none;
+}
+
+.settings-container {
+  background-color: rgba(0, 0, 0, 0.03);
+  border-radius: 8px;
+  padding: 2em;
+}
+
+.settings-container h2 {
+  margin-top: 0;
+}
+
+.settings-container textarea {
+  min-height: 200px;
+  resize: vertical;
+}
+
+.prompt-hint {
+  font-size: 0.8em;
+  color: #666;
+  margin-top: 0.5em;
 }
 
 .idle-container, .pending-container {
@@ -360,5 +406,17 @@ button {
 
   .app-layout {
     background-color: #2f2f2f;
+  }
+
+  .settings-button:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+  }
+
+  .settings-container {
+    background-color: rgba(255, 255, 255, 0.05);
+  }
+
+  .prompt-hint {
+    color: #aaa;
   }
 }

@@ -119,7 +119,8 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             greet,
             api::respond_to_llm_request,
-            launch_aider_batch
+            launch_aider_batch,
+            api::update_prompt_settings
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application");

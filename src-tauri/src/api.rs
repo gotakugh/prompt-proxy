@@ -7,6 +7,13 @@ use tokio::sync::{oneshot, Mutex};
 use tower_http::cors::{Any, CorsLayer};
 use uuid::Uuid;
 
+#[derive(serde::Deserialize, serde::Serialize, Clone, Debug)]
+pub struct PromptSettings {
+    pub use_custom: bool,
+    pub custom_edit_prompt: String,
+    pub custom_ask_prompt: String,
+}
+
 type ResponderTx = oneshot::Sender<String>;
 
 // OpenAI-compatible response structures
@@ -44,6 +51,7 @@ struct Message {
 // the Axum handlers and Tauri commands.
 pub struct AppState {
     pub pending_requests: Arc<Mutex<HashMap<String, ResponderTx>>>,
+    pub prompt_settings: Arc<Mutex<PromptSettings>>,
 }
 
 async fn chat_completions_handler(
@@ -217,33 +225,44 @@ async fn chat_completions_handler(
     // AiderがSEARCH/REPLACEを要求しているか（Editモードか）を判定
     let expects_edit = context_content.contains("SEARCH/REPLACE");
 
-    let format_instruction = if expects_edit {
-        "【重要】出力フォーマットの厳守：\n\
-     1. 挨拶や解説などのテキストは一切省いてください。\n\
-     2. 出力全体をマークダウンのコードブロック（```）で囲んでください。\n\
-     3. Aiderが認識できるように、ブロックの先頭には必ず「対象のファイルパス」を単独の行で記述してください。\n\n\
-     【出力フォーマット例】\n\
-     ```\n\
-     path/to/file.rs\n\
-     <<<<<<< SEARCH\n\
-     修正前のコード\n\
-     =======\n\
-     修正後のコード\n\
-     >>>>>>> REPLACE\n\
-     ```"
-    } else {
-        "【重要】ユーザーからの質問に対する回答を、自然なテキストで出力してください（コード修正フォーマットは不要です）。"
-    };
+    let state: tauri::State<AppState> = app_handle.state();
+    let settings = state.prompt_settings.lock().await;
 
     // 3. Create final prompt
-    let final_prompt = format!(
-        "添付された `context.xml` を読み込み、コンテキストを理解した上で、以下の指示に対応してください。\n\n\
-         === 指示内容 ===\n\
-         {}\n\
-         ================\n\n\
-         {}",
-        user_instruction, format_instruction
-    );
+    let final_prompt = if settings.use_custom {
+        let template = if expects_edit {
+            &settings.custom_edit_prompt
+        } else {
+            &settings.custom_ask_prompt
+        };
+        template.replace("{instruction}", &user_instruction)
+    } else {
+        let format_instruction = if expects_edit {
+            "【重要】出力フォーマットの厳守：\n\
+         1. 挨拶や解説などのテキストは一切省いてください。\n\
+         2. 出力全体をマークダウンのコードブロック（```）で囲んでください。\n\
+         3. Aiderが認識できるように、ブロックの先頭には必ず「対象のファイルパス」を単独の行で記述してください。\n\n\
+         【出力フォーマット例】\n\
+         ```\n\
+         path/to/file.rs\n\
+         <<<<<<< SEARCH\n\
+         修正前のコード\n\
+         =======\n\
+         修正後のコード\n\
+         >>>>>>> REPLACE\n\
+         ```"
+        } else {
+            "【重要】ユーザーからの質問に対する回答を、自然なテキストで出力してください（コード修正フォーマットは不要です）。"
+        };
+        format!(
+            "添付された `context.xml` を読み込み、コンテキストを理解した上で、以下の指示に対応してください。\n\n\
+             === 指示内容 ===\n\
+             {}\n\
+             ================\n\n\
+             {}",
+            user_instruction, format_instruction
+        )
+    };
 
     println!("=> [PromptProxy] XMLとプロンプトの生成が完了しました");
 
@@ -357,11 +376,28 @@ pub async fn respond_to_llm_request(
     }
 }
 
+#[tauri::command]
+pub async fn update_prompt_settings(
+    settings: PromptSettings,
+    state: tauri::State<'_, AppState>,
+) -> Result<(), String> {
+    println!("=> [PromptProxy] 設定を更新しました: {:?}", settings);
+    let mut current_settings = state.prompt_settings.lock().await;
+    *current_settings = settings;
+    Ok(())
+}
+
 // This function initializes and runs the Axum server in a background task.
 pub fn init(app_handle: &AppHandle) {
     // Create and manage our application state
+    let settings = PromptSettings {
+        use_custom: false,
+        custom_edit_prompt: String::new(),
+        custom_ask_prompt: String::new(),
+    };
     let state = AppState {
         pending_requests: Arc::new(Mutex::new(HashMap::new())),
+        prompt_settings: Arc::new(Mutex::new(settings)),
     };
     app_handle.manage(state);
 
