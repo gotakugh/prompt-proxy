@@ -21,6 +21,7 @@ function App() {
   const [targetDir, setTargetDir] = useState("");
   const [files, setFiles] = useState("");
   const [instruction, setInstruction] = useState("");
+  const [chatLanguage, setChatLanguage] = useState(() => localStorage.getItem("chatLanguage") || "Japanese");
   const [promptData, setPromptData] = useState<PromptPayload | null>(null);
   const [aiResponse, setAiResponse] = useState("");
   const [logs, setLogs] = useState<string[]>([]);
@@ -69,6 +70,10 @@ function App() {
       console.error
     );
   }, [useCustomPrompt, customEditPrompt, customAskPrompt]);
+
+  useEffect(() => {
+    localStorage.setItem("chatLanguage", chatLanguage);
+  }, [chatLanguage]);
 
   useEffect(() => {
     const unlisten = listen<PromptPayload>("prompt_received", (event) => {
@@ -143,6 +148,7 @@ function App() {
       targetDir,
       files,
       message: finalMessage,
+      chatLanguage,
     });
     setAppState("idle");
   };
@@ -276,6 +282,15 @@ function App() {
                 value={files}
                 onChange={(e) => setFiles(e.target.value)}
                 placeholder="src/main.rs src/lib.rs"
+              />
+            </div>
+            <div className="form-group">
+              <label>チャット言語 (Aiderの思考・返答言語)</label>
+              <input
+                type="text"
+                value={chatLanguage}
+                onChange={(e) => setChatLanguage(e.target.value)}
+                placeholder="Japanese, English など（空欄でOS設定に従う）"
               />
             </div>
             <div className="form-group">

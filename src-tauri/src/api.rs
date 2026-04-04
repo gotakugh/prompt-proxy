@@ -356,10 +356,11 @@ pub async fn respond_to_llm_request(
 
                     let target_dir = session.target_dir.clone();
                     let message = session.message.clone();
+                    let chat_language = session.chat_language.clone();
 
                     tokio::spawn(async move {
                         tokio::time::sleep(Duration::from_secs(1)).await;
-                        crate::spawn_aider_process(&app_handle, target_dir, new_files, message);
+                        crate::spawn_aider_process(&app_handle, target_dir, new_files, message, chat_language);
                     });
                 }
 
