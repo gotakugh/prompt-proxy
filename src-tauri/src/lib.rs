@@ -40,6 +40,7 @@ fn launch_aider_batch(target_dir: String, files: String, message: String) {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
             // Start the API server in a background task
             api::init(&app.handle());

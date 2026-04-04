@@ -71,14 +71,13 @@ async fn chat_completions_handler(
         }
     };
 
-    let last_user_message_index =
-        match messages
-            .iter()
-            .rposition(|m| m.get("role").and_then(|r| r.as_str()) == Some("user"))
-        {
-            Some(i) => i,
-            None => return Json(json!({"error": "No user message found in messages"})).into_response(),
-        };
+    let last_user_message_index = match messages
+        .iter()
+        .rposition(|m| m.get("role").and_then(|r| r.as_str()) == Some("user"))
+    {
+        Some(i) => i,
+        None => return Json(json!({"error": "No user message found in messages"})).into_response(),
+    };
 
     let user_instruction = messages[last_user_message_index]
         .get("content")
@@ -168,9 +167,7 @@ async fn chat_completions_handler(
         prompt: &final_prompt,
     };
 
-    app_handle
-        .emit("prompt_received", &prompt_payload)
-        .unwrap();
+    app_handle.emit("prompt_received", &prompt_payload).unwrap();
 
     println!("=> [PromptProxy] フロントエンドにイベントを送信し、待機を開始します...");
 
@@ -201,7 +198,9 @@ async fn chat_completions_handler(
             Json(completion).into_response()
         }
         Err(_) => {
-            println!("=> [PromptProxy] Error: oneshot channel was closed before receiving a response.");
+            println!(
+                "=> [PromptProxy] Error: oneshot channel was closed before receiving a response."
+            );
             Json(json!({ "error": "Internal error: oneshot channel was closed" })).into_response()
         }
     }
@@ -246,10 +245,7 @@ pub fn init(app_handle: &AppHandle) {
         let listener = tokio::net::TcpListener::bind("127.0.0.1:8080")
             .await
             .unwrap();
-        println!(
-            "API server listening on {}",
-            listener.local_addr().unwrap()
-        );
+        println!("API server listening on {}", listener.local_addr().unwrap());
         axum::serve(listener, app).await.unwrap();
     });
 }
