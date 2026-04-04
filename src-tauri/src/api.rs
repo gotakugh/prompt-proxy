@@ -141,7 +141,18 @@ async fn chat_completions_handler(
             .into_response();
     }
 
-    let context_file_path = match temp_path.to_str() {
+    // Ensure the path is absolute for the OS drag API to work correctly.
+    let absolute_path = match std::fs::canonicalize(&temp_path) {
+        Ok(path) => path,
+        Err(e) => {
+            return Json(
+                json!({ "error": format!("Failed to get absolute path for context.xml: {}", e)}),
+            )
+            .into_response()
+        }
+    };
+
+    let context_file_path = match absolute_path.to_str() {
         Some(s) => s.to_string(),
         None => return Json(json!({"error": "Temp path contains invalid UTF-8"})).into_response(),
     };

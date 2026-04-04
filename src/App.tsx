@@ -144,12 +144,14 @@ function App() {
 
           <div className="info-box">
             <h3>コンテキストファイル</h3>
-            <div
-              className="draggable-file"
-              draggable={true}
-              onDragStart={handleDragFile}
-            >
-              📄 掴んでブラウザへドロップ (context.xml)
+            <div className="draggable-file-wrapper">
+              <div
+                className="draggable-file"
+                draggable={true}
+                onDragStart={handleDragFile}
+              >
+                📄 掴んでブラウザへドロップ (context.xml)
+              </div>
             </div>
           </div>
 

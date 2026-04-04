@@ -188,20 +188,33 @@ button {
 
 .draggable-file {
   cursor: grab;
-  padding: 1em;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 20px;
+  border: 1px solid #ccc;
   border-radius: 8px;
-  background-color: rgba(0, 0, 0, 0.1);
-  border: 2px dashed #888;
-  text-align: center;
-  transition: background-color 0.2s;
+  background-color: #ffffff;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  width: fit-content;
+  transition: transform 0.1s, box-shadow 0.1s;
+  color: #0f0f0f;
 }
 
 .draggable-file:hover {
-  background-color: rgba(0, 0, 0, 0.15);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
 }
 
 .draggable-file:active {
   cursor: grabbing;
+  transform: translateY(0);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.draggable-file-wrapper {
+  text-align: center;
+  padding: 0.5em 0;
 }
 
 .prompt-display {
@@ -266,5 +279,11 @@ button {
     background-color: #0f0f0f98;
     color: #ffffff;
     border-color: #555;
+  }
+
+  .draggable-file {
+    background-color: #2a2a2a;
+    border-color: #555;
+    color: #f6f6f6;
   }
 }
