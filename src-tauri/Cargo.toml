@@ -28,4 +28,5 @@ tower-http = { version = "0.5", features = ["cors"] }
 uuid = { version = "1", features = ["v4"] }
 time = "0.3"
 tauri-plugin-dialog = "2"
+tauri-plugin-drag = "2.1.0"
 
