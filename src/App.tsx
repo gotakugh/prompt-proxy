@@ -17,6 +17,7 @@ interface PromptPayload {
 
 function App() {
   const [appState, setAppState] = useState<AppState>("init");
+  const [mode, setMode] = useState<"edit" | "ask">("edit");
   const [targetDir, setTargetDir] = useState("");
   const [files, setFiles] = useState("");
   const [instruction, setInstruction] = useState("");
@@ -89,10 +90,11 @@ function App() {
   };
 
   const handleLaunchAider = async () => {
+    const finalMessage = mode === "ask" ? `/ask ${instruction}` : instruction;
     await invoke("launch_aider_batch", {
       targetDir,
       files,
-      message: instruction,
+      message: finalMessage,
     });
     setAppState("idle");
   };
@@ -174,6 +176,29 @@ function App() {
               onChange={(e) => setFiles(e.target.value)}
               placeholder="src/main.rs src/lib.rs"
             />
+          </div>
+          <div className="form-group">
+            <label>操作モード</label>
+            <div className="mode-selector">
+              <label>
+                <input
+                  type="radio"
+                  value="edit"
+                  checked={mode === 'edit'}
+                  onChange={() => setMode('edit')}
+                />
+                コードを修正する (Edit)
+              </label>
+              <label>
+                <input
+                  type="radio"
+                  value="ask"
+                  checked={mode === 'ask'}
+                  onChange={() => setMode('ask')}
+                />
+                リポジトリについて質問する (Ask)
+              </label>
+            </div>
           </div>
           <div className="form-group">
             <label>Aiderへの指示</label>

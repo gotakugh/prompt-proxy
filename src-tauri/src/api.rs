@@ -214,14 +214,23 @@ async fn chat_completions_handler(
         json_file_path = json_file_path.replace("\\\\?\\", "");
     }
 
+    // AiderがSEARCH/REPLACEを要求しているか（Editモードか）を判定
+    let expects_edit = context_content.contains("SEARCH/REPLACE");
+
+    let format_instruction = if expects_edit {
+        "【重要】出力は挨拶や解説を一切省き、SEARCH/REPLACEブロックのみを使用すること。"
+    } else {
+        "【重要】ユーザーからの質問に対する回答を、自然なテキストで出力してください（コード修正フォーマットは不要です）。"
+    };
+
     // 3. Create final prompt
     let final_prompt = format!(
-        "添付された `context.xml` を読み込み、コンテキストを理解した上で、以下の指示に従ってコードを修正してください。\n\n\
+        "添付された `context.xml` を読み込み、コンテキストを理解した上で、以下の指示に対応してください。\n\n\
          === 指示内容 ===\n\
          {}\n\
          ================\n\n\
-         【重要】出力は挨拶や解説を一切省き、SEARCH/REPLACEブロックのみを使用すること。",
-        user_instruction
+         {}",
+        user_instruction, format_instruction
     );
 
     println!("=> [PromptProxy] XMLとプロンプトの生成が完了しました");
