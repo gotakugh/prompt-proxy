@@ -246,15 +246,17 @@ button {
 .terminal-log {
   flex: 1;
   background-color: #1e1e1e;
-  color: #4af626;
-  font-family: monospace;
+  color: #d4d4d4;
+  font-family: Consolas, "Courier New", monospace;
   padding: 10px;
   border-radius: 6px;
-  height: 150px;
+  height: 300px;
   overflow-y: auto;
   text-align: left;
   margin-bottom: 1em;
   white-space: pre-wrap;
+  line-height: 1.5;
+  border: 1px solid #333;
 }
 
 .debug-files {

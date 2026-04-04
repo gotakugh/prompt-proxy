@@ -1,5 +1,6 @@
 mod api;
-use std::process::{Child, Command};
+use std::io::{BufRead, BufReader};
+use std::process::{Child, Command, Stdio};
 use std::sync::Mutex;
 use std::thread;
 use std::time::Duration;
@@ -19,6 +20,7 @@ fn launch_aider_batch(
     files: String,
     message: String,
     state: tauri::State<'_, AiderProcessState>,
+    app_handle: tauri::AppHandle,
 ) {
     let mut command = Command::new("aider");
     command.current_dir(&target_dir);
@@ -43,8 +45,33 @@ fn launch_aider_batch(
 
     command.arg("--message").arg(message);
 
+    command.stdout(Stdio::piped()).stderr(Stdio::piped());
+
     match command.spawn() {
-        Ok(child) => {
+        Ok(mut child) => {
+            if let Some(stdout) = child.stdout.take() {
+                let app_handle_clone = app_handle.clone();
+                std::thread::spawn(move || {
+                    let reader = BufReader::new(stdout);
+                    for line in reader.lines() {
+                        if let Ok(line) = line {
+                            let _ = app_handle_clone.emit("aider_log", line);
+                        }
+                    }
+                });
+            }
+            if let Some(stderr) = child.stderr.take() {
+                let app_handle_clone = app_handle.clone();
+                std::thread::spawn(move || {
+                    let reader = BufReader::new(stderr);
+                    for line in reader.lines() {
+                        if let Ok(line) = line {
+                            let _ = app_handle_clone.emit("aider_log", line);
+                        }
+                    }
+                });
+            }
+
             state.0.lock().unwrap().push(child);
         }
         Err(e) => {

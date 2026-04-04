@@ -1,4 +1,4 @@
-import { useState, useEffect, DragEvent } from "react";
+import { useState, useEffect, DragEvent, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { open } from "@tauri-apps/plugin-dialog";
@@ -24,16 +24,27 @@ function App() {
   const [aiResponse, setAiResponse] = useState("");
   const [showDebug, setShowDebug] = useState(false);
   const [logs, setLogs] = useState<string[]>([]);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [logs]);
 
   useEffect(() => {
     const unlisten = listen<PromptPayload>("prompt_received", (event) => {
-      setLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] ⬇️ Aiderからのリクエストを受信しました`]);
+      setLogs(prev => [...prev, `--- PromptProxy: Received request from Aider [${new Date().toLocaleTimeString()}] ---`]);
       setPromptData(event.payload);
       setAiResponse(""); // Clear previous response
       setAppState("pending");
     });
+
+    const unlistenAiderLog = listen<string>("aider_log", (event) => {
+      setLogs(prev => [...prev, event.payload]);
+    });
+
     return () => {
       unlisten.then((fn) => fn());
+      unlistenAiderLog.then((fn) => fn());
     };
   }, []);
 
@@ -47,7 +58,7 @@ function App() {
 
   const sendResponseToAider = async (response: string) => {
     if (promptData?.request_id) {
-      setLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] ⬆️ Aiderへレスポンスを送信しました`]);
+      setLogs(prev => [...prev, `--- PromptProxy: Sending response to Aider [${new Date().toLocaleTimeString()}] ---`]);
       await invoke("respond_to_llm_request", {
         requestId: promptData.request_id,
         response,
@@ -242,6 +253,7 @@ function App() {
             {logs.map((log, index) => (
               <div key={index}>{log}</div>
             ))}
+            <div ref={messagesEndRef} />
           </div>
           {promptData && (
             <div className="debug-files">
