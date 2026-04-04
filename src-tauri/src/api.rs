@@ -124,7 +124,13 @@ async fn chat_completions_handler(
     }
 
     let xml_string = format!(
-        "<repository><![CDATA[{}]]></repository>\n{}",
+        "<instructions>\n\
+         このファイルは、対象プロジェクトのソースコードとリポジトリ全体のコンテキストをXML形式でまとめたものです。\n\
+         - <repository> タグ内には、リポジトリの構造や重要なルールが含まれています。\n\
+         - <file path=\"...\"> タグ内には、各ファイルの実コードが含まれています。\n\
+         別途提供されるユーザーの指示に従い、このコンテキストを参照してコードの修正を行ってください。\n\
+         </instructions>\n\n\
+         <repository><![CDATA[{}]]></repository>\n{}",
         repo_info, files_xml
     );
 
@@ -210,7 +216,11 @@ async fn chat_completions_handler(
 
     // 3. Create final prompt
     let final_prompt = format!(
-        "{}\n\n【重要】出力は挨拶や解説を一切省き、SEARCH/REPLACEブロックのみを使用すること。",
+        "添付された `context.xml` を読み込み、コンテキストを理解した上で、以下の指示に従ってコードを修正してください。\n\n\
+         === 指示内容 ===\n\
+         {}\n\
+         ================\n\n\
+         【重要】出力は挨拶や解説を一切省き、SEARCH/REPLACEブロックのみを使用すること。",
         user_instruction
     );
 
