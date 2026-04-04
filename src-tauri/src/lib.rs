@@ -4,7 +4,7 @@ use std::process::{Child, Command, Stdio};
 use std::sync::Mutex;
 use std::thread;
 use std::time::Duration;
-use tauri::Manager;
+use tauri::{Emitter, Manager};
 
 struct AiderProcessState(Mutex<Vec<Child>>);
 
