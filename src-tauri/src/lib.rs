@@ -47,6 +47,7 @@ pub fn run() {
             Ok(())
         })
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_drag::init())
         .invoke_handler(tauri::generate_handler![
             greet,
             api::respond_to_llm_request,

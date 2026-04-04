@@ -1,7 +1,8 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, DragEvent } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { open } from "@tauri-apps/plugin-dialog";
+import { startDrag } from "@crabnebula/tauri-plugin-drag";
 import "./App.css";
 
 type AppState = "init" | "idle" | "pending";
@@ -79,6 +80,15 @@ function App() {
     setAppState("idle");
   };
 
+  const handleDragFile = (e: DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    if (promptData?.context_file_path) {
+      startDrag({
+        item: [promptData.context_file_path],
+      });
+    }
+  };
+
   return (
     <main className="container">
       <h1>LLM Prompt Proxy</h1>
@@ -134,8 +144,13 @@ function App() {
 
           <div className="info-box">
             <h3>コンテキストファイル</h3>
-            <p>このファイルをブラウザに添付してください:</p>
-            <code>{promptData.context_file_path}</code>
+            <div
+              className="draggable-file"
+              draggable={true}
+              onDragStart={handleDragFile}
+            >
+              📄 掴んでブラウザへドロップ (context.xml)
+            </div>
           </div>
 
           <div className="info-box">

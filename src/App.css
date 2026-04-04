@@ -186,6 +186,24 @@ button {
   word-wrap: break-word;
 }
 
+.draggable-file {
+  cursor: grab;
+  padding: 1em;
+  border-radius: 8px;
+  background-color: rgba(0, 0, 0, 0.1);
+  border: 2px dashed #888;
+  text-align: center;
+  transition: background-color 0.2s;
+}
+
+.draggable-file:hover {
+  background-color: rgba(0, 0, 0, 0.15);
+}
+
+.draggable-file:active {
+  cursor: grabbing;
+}
+
 .prompt-display {
   position: relative;
 }
