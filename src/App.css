@@ -5,6 +5,13 @@
 .logo.react:hover {
   filter: drop-shadow(0 0 2em #61dafb);
 }
+
+body, #root {
+  margin: 0;
+  padding: 0;
+  height: 100vh;
+}
+
 :root {
   font-family: Inter, Avenir, Helvetica, Arial, sans-serif;
   font-size: 16px;
@@ -21,14 +28,6 @@
   -webkit-text-size-adjust: 100%;
 }
 
-.container {
-  margin: 0;
-  padding-top: 10vh;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  text-align: center;
-}
 
 .logo {
   height: 6em;
@@ -115,8 +114,29 @@ button {
   }
 }
 
-.container {
-  padding-top: 2vh;
+.app-layout {
+  display: flex;
+  flex-direction: row;
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
+  background-color: #f6f6f6;
+}
+
+.main-pane {
+  flex: 1;
+  padding: 2em;
+  overflow-y: auto;
+}
+
+.terminal-pane {
+  width: 450px;
+  min-width: 400px;
+  background-color: #1e1e1e;
+  display: flex;
+  flex-direction: column;
+  padding: 1em;
+  border-left: 1px solid #333;
 }
 
 .init-container {
@@ -235,46 +255,17 @@ button {
   word-break: break-all;
 }
 
-.debug-toggle-wrapper {
-  text-align: center;
-  margin-top: 2em;
-  padding-bottom: 1em;
-}
-
-.debug-toggle-button {
-  background-color: transparent;
-  border: 1px solid #888;
-  color: #888;
-  box-shadow: none;
-}
-.debug-toggle-button:hover {
-  background-color: rgba(0, 0, 0, 0.05);
-  border-color: #555;
-}
-
-.debug-container {
-  max-width: 800px;
-  margin: 0 auto;
-  padding: 0 1em;
-  display: flex;
-  gap: 1em;
-  align-items: flex-start;
-}
 
 .terminal-log {
   flex: 1;
-  background-color: #1e1e1e;
   color: #d4d4d4;
   font-family: Consolas, "Courier New", monospace;
-  padding: 10px;
-  border-radius: 6px;
-  height: 300px;
+  line-height: 1.5;
   overflow-y: auto;
   text-align: left;
-  margin-bottom: 1em;
   white-space: pre-wrap;
-  line-height: 1.5;
-  border: 1px solid #333;
+  font-size: 0.9em;
+  margin-bottom: 1em;
 }
 
 .debug-files {
@@ -363,12 +354,7 @@ button {
   }
   .file-name { color: #f6f6f6; }
 
-  .debug-toggle-button {
-    color: #aaa;
-    border-color: #aaa;
-  }
-  .debug-toggle-button:hover {
-    background-color: rgba(255, 255, 255, 0.1);
-    border-color: #ccc;
+  .app-layout {
+    background-color: #2f2f2f;
   }
 }
