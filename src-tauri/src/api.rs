@@ -1,6 +1,6 @@
 use axum::{extract::State, response::IntoResponse, routing::post, Json, Router};
 use serde_json::{json, Value};
-use std::{collections::HashMap, fs, sync::Arc};
+use std::{collections::HashMap, fs, sync::Arc, time::Duration};
 use tauri::{AppHandle, Emitter, Manager};
 use time::OffsetDateTime;
 use tokio::sync::{oneshot, Mutex};
@@ -218,7 +218,9 @@ async fn chat_completions_handler(
     let expects_edit = context_content.contains("SEARCH/REPLACE");
 
     let format_instruction = if expects_edit {
-        "【重要】出力は挨拶や解説を一切省き、SEARCH/REPLACEブロックのみを使用すること。"
+        "【重要】出力ルールの厳守：\n\
+     1. 通常のコード修正時は、挨拶や解説を一切省き、SEARCH/REPLACEブロックのみを使用すること。\n\
+     2. 修正に必要なファイルが context.xml 内に不足していると判断した場合のみ、絶対に他のテキストを含めず `[ADD_FILE: ファイルパス]` という書式のみを出力すること。"
     } else {
         "【重要】ユーザーからの質問に対する回答を、自然なテキストで出力してください（コード修正フォーマットは不要です）。"
     };
@@ -297,8 +299,46 @@ pub async fn respond_to_llm_request(
     request_id: String,
     response: String,
     state: tauri::State<'_, AppState>,
+    session_state: tauri::State<'_, crate::AiderSessionState>,
+    app_handle: tauri::AppHandle,
 ) -> Result<(), String> {
     println!("=> [PromptProxy] Reactから受信したテキスト: {}", response);
+
+    if response.contains("[ADD_FILE:") {
+        if let Some(start) = response.find("[ADD_FILE:") {
+            let start = start + "[ADD_FILE:".len();
+            if let Some(end) = response[start..].find(']') {
+                let file_path = response[start..start + end].trim();
+                println!("=> [PromptProxy] AIがファイルの追加を要求しました: {}", file_path);
+
+                if let Some(tx) = state.pending_requests.lock().await.remove(&request_id) {
+                    let _ = tx.send("Understood. Restarting with the requested file.".to_string());
+                }
+
+                if let Some(session) = session_state.0.lock().unwrap().as_mut() {
+                    let mut files: Vec<&str> = session.files.split_whitespace().collect();
+                    if !files.contains(&file_path) {
+                        files.push(file_path);
+                    }
+                    let new_files = files.join(" ");
+                    session.files = new_files.clone();
+
+                    app_handle.emit("file_added_by_ai", &new_files).unwrap();
+
+                    let target_dir = session.target_dir.clone();
+                    let message = session.message.clone();
+
+                    tokio::spawn(async move {
+                        tokio::time::sleep(Duration::from_secs(1)).await;
+                        crate::spawn_aider_process(&app_handle, target_dir, new_files, message);
+                    });
+                }
+
+                return Ok(());
+            }
+        }
+    }
+
     if let Some(tx) = state.pending_requests.lock().await.remove(&request_id) {
         tx.send(response)
             .map_err(|_| "Failed to send response".to_string())

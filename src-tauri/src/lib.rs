@@ -6,7 +6,14 @@ use std::thread;
 use std::time::Duration;
 use tauri::{Emitter, Manager};
 
-struct AiderProcessState(Mutex<Vec<Child>>);
+pub struct AiderProcessState(pub Mutex<Vec<Child>>);
+
+pub struct AiderSession {
+    pub target_dir: String,
+    pub files: String,
+    pub message: String,
+}
+pub struct AiderSessionState(pub Mutex<Option<AiderSession>>);
 
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 #[tauri::command]
@@ -19,9 +26,21 @@ fn launch_aider_batch(
     target_dir: String,
     files: String,
     message: String,
-    state: tauri::State<'_, AiderProcessState>,
     app_handle: tauri::AppHandle,
+    session_state: tauri::State<'_, AiderSessionState>,
 ) {
+    // Save the session for potential restarts
+    let session = AiderSession {
+        target_dir: target_dir.clone(),
+        files: files.clone(),
+        message: message.clone(),
+    };
+    *session_state.0.lock().unwrap() = Some(session);
+
+    spawn_aider_process(&app_handle, target_dir, files, message);
+}
+
+pub fn spawn_aider_process(app_handle: &tauri::AppHandle, target_dir: String, files: String, message: String) {
     let mut command = Command::new("aider");
     command.current_dir(&target_dir);
 
@@ -47,10 +66,13 @@ fn launch_aider_batch(
 
     command.stdout(Stdio::piped()).stderr(Stdio::piped());
 
+    let state = app_handle.state::<AiderProcessState>();
+    let app_handle_clone = app_handle.clone();
+
     match command.spawn() {
         Ok(mut child) => {
             if let Some(stdout) = child.stdout.take() {
-                let app_handle_clone = app_handle.clone();
+                let app_handle_clone = app_handle_clone.clone();
                 std::thread::spawn(move || {
                     let reader = BufReader::new(stdout);
                     for line in reader.lines() {
@@ -61,7 +83,7 @@ fn launch_aider_batch(
                 });
             }
             if let Some(stderr) = child.stderr.take() {
-                let app_handle_clone = app_handle.clone();
+                let app_handle_clone = app_handle_clone.clone();
                 std::thread::spawn(move || {
                     let reader = BufReader::new(stderr);
                     for line in reader.lines() {
@@ -87,6 +109,7 @@ pub fn run() {
         .setup(|app| {
             // Manage the state for background processes
             app.manage(AiderProcessState(Mutex::new(Vec::new())));
+            app.manage(AiderSessionState(Mutex::new(None)));
             // Start the API server in a background task
             api::init(&app.handle());
             Ok(())

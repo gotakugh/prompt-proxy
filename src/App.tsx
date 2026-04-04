@@ -42,9 +42,18 @@ function App() {
       setLogs(prev => [...prev, event.payload]);
     });
 
+    const unlistenFileAdded = listen<string>("file_added_by_ai", (event) => {
+      setFiles(event.payload);
+      setAppState("idle");
+      setPromptData(null);
+      setAiResponse("");
+      setLogs(prev => [...prev, `[PromptProxy] 🔄 ファイルを追加してAiderを再起動しています...`]);
+    });
+
     return () => {
       unlisten.then((fn) => fn());
       unlistenAiderLog.then((fn) => fn());
+      unlistenFileAdded.then((fn) => fn());
     };
   }, []);
 
