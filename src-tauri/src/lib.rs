@@ -76,7 +76,8 @@ pub fn run() {
 
     app.run(|app_handle, event| {
         if let tauri::RunEvent::Exit = event {
-            let mut processes = app_handle.state::<AiderProcessState>().0.lock().unwrap();
+            let state = app_handle.state::<AiderProcessState>();
+            let mut processes = state.0.lock().unwrap();
             for mut child in processes.drain(..) {
                 let pid = child.id();
 
