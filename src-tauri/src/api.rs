@@ -135,7 +135,7 @@ async fn chat_completions_handler(
         }
     };
 
-    let payload_str = serde_json::to_string_pretty(&payload.0).unwrap();
+    let payload_str = serde_json::to_string_pretty(&payload).unwrap();
     let json_path = temp_dir.join("aider_payload.json");
     if let Err(e) = fs::write(&json_path, payload_str) {
         return Json(json!({ "error": format!("Failed to write aider_payload.json: {}", e)}))
