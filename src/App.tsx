@@ -87,29 +87,51 @@ function App() {
   };
 
   const handleDragFile = async (e: DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
     if (promptData?.context_file_path && promptData?.icon_file_path) {
-      try {
-        await startDrag({
-          item: [promptData.context_file_path],
-          icon: promptData.icon_file_path,
-        });
-      } catch (error) {
-        console.error("Drag failed:", error);
+      const isLinux = navigator.userAgent.toLowerCase().includes("linux");
+
+      if (isLinux) {
+        // Linux (X11): WebKitGTKのネイティブドラッグプロトコルに任せ、正しいイベントコンテキストを保持する
+        const uri = 'file://' + promptData.context_file_path;
+        e.dataTransfer?.setData('text/uri-list', uri + '\r\n');
+        e.dataTransfer?.setData('text/plain', promptData.context_file_path);
+        // e.preventDefault() は呼ばない！
+      } else {
+        // Windows/Mac: Tauriのネイティブプラグインを使用
+        e.preventDefault();
+        try {
+          await startDrag({
+            item: [promptData.context_file_path],
+            icon: promptData.icon_file_path,
+          });
+        } catch (error) {
+          console.error("Drag failed:", error);
+        }
       }
     }
   };
 
   const handleDragJsonFile = async (e: DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
     if (promptData?.json_file_path && promptData?.icon_file_path) {
-      try {
-        await startDrag({
-          item: [promptData.json_file_path],
-          icon: promptData.icon_file_path,
-        });
-      } catch (error) {
-        console.error("Drag failed:", error);
+      const isLinux = navigator.userAgent.toLowerCase().includes("linux");
+
+      if (isLinux) {
+        // Linux (X11): WebKitGTKのネイティブドラッグプロトコルに任せ、正しいイベントコンテキストを保持する
+        const uri = 'file://' + promptData.json_file_path;
+        e.dataTransfer?.setData('text/uri-list', uri + '\r\n');
+        e.dataTransfer?.setData('text/plain', promptData.json_file_path);
+        // e.preventDefault() は呼ばない！
+      } else {
+        // Windows/Mac: Tauriのネイティブプラグインを使用
+        e.preventDefault();
+        try {
+          await startDrag({
+            item: [promptData.json_file_path],
+            icon: promptData.icon_file_path,
+          });
+        } catch (error) {
+          console.error("Drag failed:", error);
+        }
       }
     }
   };
