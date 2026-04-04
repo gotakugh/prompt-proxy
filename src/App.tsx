@@ -80,12 +80,16 @@ function App() {
     setAppState("idle");
   };
 
-  const handleDragFile = (e: DragEvent<HTMLDivElement>) => {
+  const handleDragFile = async (e: DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     if (promptData?.context_file_path) {
-      startDrag({
-        item: [promptData.context_file_path],
-      });
+      try {
+        await startDrag({
+          item: [promptData.context_file_path],
+        });
+      } catch (error) {
+        console.error("Drag failed:", error);
+      }
     }
   };
 

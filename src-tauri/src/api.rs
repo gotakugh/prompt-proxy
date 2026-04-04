@@ -152,10 +152,14 @@ async fn chat_completions_handler(
         }
     };
 
-    let context_file_path = match absolute_path.to_str() {
+    let mut context_file_path = match absolute_path.to_str() {
         Some(s) => s.to_string(),
         None => return Json(json!({"error": "Temp path contains invalid UTF-8"})).into_response(),
     };
+    // Remove the UNC path prefix on Windows to ensure the OS drag API works correctly.
+    if context_file_path.starts_with("\\\\?\\") {
+        context_file_path = context_file_path.replace("\\\\?\\", "");
+    }
 
     // 3. Create final prompt
     let final_prompt = format!(
