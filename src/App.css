@@ -151,7 +151,7 @@ button {
 }
 .status-header {
   flex-shrink: 0;
-  padding: 1em 2em;
+  padding: 0.5em 1.5em; /* 余白を削減 */
   background-color: #ffffff;
   border-bottom: 1px solid #ddd;
   display: flex;
@@ -167,9 +167,21 @@ button {
 .stepper .active {
   color: #396cd8;
 }
+.reset-button {
+  background-color: transparent;
+  color: #555;
+  border: 1px solid #ccc;
+  box-shadow: none;
+  padding: 0.4em 0.8em;
+  font-size: 0.9em;
+}
+.reset-button:hover {
+  background-color: rgba(0, 0, 0, 0.05);
+  border-color: #999;
+}
 .main-content {
   flex: 1;
-  padding: 2em;
+  padding: 1em 1.5em; /* 余白を削減 */
   overflow-y: auto;
   display: flex;
   flex-direction: column;
@@ -186,12 +198,12 @@ button {
 }
 
 .card {
-  max-width: 800px;
-  margin: 0 auto 2em;
-  padding: 2em;
+  max-width: 100%; /* 幅の制限を解除して領域を有効活用 */
+  margin: 0 0 1em 0; /* マージンを削減 */
+  padding: 1.2em 1.5em; /* パディングを削減 */
   text-align: left;
   background-color: rgba(0, 0, 0, 0.03);
-  border-radius: 8px;
+  border-radius: 6px;
   transition: opacity 0.2s ease-in-out;
 }
 
@@ -201,6 +213,8 @@ button {
 
 .card h3 {
   margin-top: 0;
+  margin-bottom: 0.8em;
+  font-size: 1.1em;
 }
 
 .card.inactive {
@@ -224,8 +238,8 @@ button {
 .form-group {
   display: flex;
   flex-direction: column;
-  margin-bottom: 1.5em;
-  gap: 0.5em;
+  margin-bottom: 0.8em; /* マージンを削減 */
+  gap: 0.3em; /* ギャップを削減 */
 }
 
 .form-group label {
@@ -288,8 +302,8 @@ button {
 }
 
 .info-box, .response-box {
-  margin-bottom: 2em;
-  padding: 1em;
+  margin-bottom: 1em;
+  padding: 0.8em;
   border-radius: 8px;
   background-color: rgba(0, 0, 0, 0.05);
 }
@@ -310,8 +324,8 @@ button {
   flex-direction: column;
   align-items: center;
   gap: 8px;
-  padding: 12px;
-  width: 100px;
+  padding: 8px;
+  width: 80px; /* アイコンを少し小さく */
   border: 1px solid transparent;
   border-radius: 6px;
   background-color: transparent;
@@ -350,10 +364,10 @@ button {
 }
 
 .draggable-file-wrapper {
-  text-align: center;
-  padding: 0.5em 0;
+  text-align: left; /* 中央揃えをやめて左詰めにする */
+  padding: 0;
   display: flex;
-  justify-content: center;
+  justify-content: flex-start;
   gap: 1em;
 }
 
@@ -379,7 +393,7 @@ button {
 .response-box textarea {
   box-sizing: border-box;
   width: 100%;
-  height: 200px;
+  height: 120px; /* 初期高さを少し抑える */
   padding: 0.5em;
   margin-bottom: 1em;
   border-radius: 8px;
@@ -446,6 +460,14 @@ button {
   .status-header {
     background-color: #2a2a2a;
     border-bottom-color: #333;
+  }
+  .reset-button {
+    color: #ccc;
+    border-color: #555;
+  }
+  .reset-button:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+    border-color: #555;
   }
 
   .settings-button:hover {

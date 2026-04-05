@@ -217,7 +217,7 @@ function App() {
           <span className={appState === "idle" ? "active" : ""}>2. Aider実行中</span> ＞ 
           <span className={appState === "pending" ? "active" : ""}>3. LLMプロキシ応答</span>
         </div>
-        <button onClick={handleReset} style={{ backgroundColor: "#ff4d4f", color: "white" }}>最初から始める</button>
+        <button onClick={handleReset} className="reset-button">🔄 リロード</button>
       </header>
       <main className="main-content">
         <div className="main-header">
@@ -228,6 +228,15 @@ function App() {
         {showSettings ? (
           <div className="settings-container">
             <h2>プロンプト設定</h2>
+            <div className="form-group">
+              <label>チャット言語 (Aiderの思考・返答言語)</label>
+              <input
+                type="text"
+                value={chatLanguage}
+                onChange={(e) => setChatLanguage(e.target.value)}
+                placeholder="Japanese, English など（空欄でOS設定に従う）"
+              />
+            </div>
             <div className="form-group">
               <div className="mode-selector">
                 <label>
@@ -295,15 +304,6 @@ function App() {
                   value={files}
                   onChange={(e) => setFiles(e.target.value)}
                   placeholder="src/main.rs src/lib.rs"
-                />
-              </div>
-              <div className="form-group">
-                <label>チャット言語 (Aiderの思考・返答言語)</label>
-                <input
-                  type="text"
-                  value={chatLanguage}
-                  onChange={(e) => setChatLanguage(e.target.value)}
-                  placeholder="Japanese, English など（空欄でOS設定に従う）"
                 />
               </div>
               <div className="form-group">
