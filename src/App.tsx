@@ -31,7 +31,13 @@ function App() {
   const [showSettings, setShowSettings] = useState(false);
   const [useCustomPrompt, setUseCustomPrompt] = useState(false);
   const [customEditPrompt, setCustomEditPrompt] = useState(
-    "添付された context.xml を読み込み、コンテキストを理解した上で、以下の指示に従ってコードを修正してください。\n\n=== 指示内容 ===\n{instruction}\n================\n\n【重要】出力は挨拶や解説を一切省き、SEARCH/REPLACEブロックのみを使用すること。"
+    "添付された context.xml を読み込み、コンテキストを理解した上で、以下の指示に従ってコードを修正してください。\n\n" +
+    "=== 指示内容 ===\n{instruction}\n================\n\n" +
+    "【重要】出力フォーマットの厳守：\n" +
+    "1. 挨拶や解説などのテキストは一切省いてください。\n" +
+    "2. 出力全体をマークダウンのコードブロック（```）で囲んでください。\n" +
+    "3. ブロックの先頭には必ず「対象のファイルパス」を単独の行で記述してください。\n" +
+    "4. 修正に必要なファイルが不足していると判断した場合のみ、絶対に他のテキストを含めず `[ADD_FILE: ファイルパス]` という書式のみを出力すること。"
   );
   const [customAskPrompt, setCustomAskPrompt] = useState(
     "添付された context.xml を読み込み、リポジトリのコンテキストを理解した上で、以下の質問に回答してください。\n\n=== 質問 ===\n{instruction}\n=============="
@@ -175,31 +181,6 @@ function App() {
         try {
           await startDrag({
             item: [promptData.context_file_path],
-            icon: promptData.icon_file_path,
-          });
-        } catch (error) {
-          console.error("Drag failed:", error);
-        }
-      }
-    }
-  };
-
-  const handleDragJsonFile = async (e: DragEvent<HTMLDivElement>) => {
-    if (promptData?.json_file_path && promptData?.icon_file_path) {
-      const isLinux = navigator.userAgent.toLowerCase().includes("linux");
-
-      if (isLinux) {
-        // Linux (X11): WebKitGTKのネイティブドラッグプロトコルに任せ、正しいイベントコンテキストを保持する
-        const uri = 'file://' + promptData.json_file_path;
-        e.dataTransfer?.setData('text/uri-list', uri + '\r\n');
-        e.dataTransfer?.setData('text/plain', promptData.json_file_path);
-        // e.preventDefault() は呼ばない！
-      } else {
-        // Windows/Mac: Tauriのネイティブプラグインを使用
-        e.preventDefault();
-        try {
-          await startDrag({
-            item: [promptData.json_file_path],
             icon: promptData.icon_file_path,
           });
         } catch (error) {
@@ -361,18 +342,6 @@ function App() {
                           <text x="50" y="78" fill="white" fontSize="36" fontFamily="monospace" textAnchor="middle" fontWeight="bold">&lt;/&gt;</text>
                         </svg>
                         <span className="file-name">context.xml</span>
-                      </div>
-                      <div
-                        className="draggable-file"
-                        draggable={true}
-                        onDragStart={handleDragJsonFile}
-                      >
-                        <svg width="64" height="80" viewBox="0 0 100 120" xmlns="http://www.w3.org/2000/svg">
-                          <path d="M0 4C0 1.8 1.8 0 4 0H65L100 35V116C100 118.2 98.2 120 96 120H4C1.8 120 0 118.2 0 116V4Z" fill="#84A8E1" />
-                          <path d="M65 0V31C65 33.2 66.8 35 69 35H100L65 0Z" fill="#6388C8" />
-                          <text x="50" y="82" fill="white" fontSize="30" fontFamily="monospace" textAnchor="middle" fontWeight="bold">JSON</text>
-                        </svg>
-                        <span className="file-name">aider_payload.json</span>
                       </div>
                     </div>
                   </div>
