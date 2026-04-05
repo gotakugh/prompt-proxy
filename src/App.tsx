@@ -260,127 +260,128 @@ function App() {
           </div>
         ) : (
           <>
-            {appState === "init" && (
-              <div className="init-container">
-                <h2>Aider 起動</h2>
-            <div className="form-group">
-              <label>対象プロジェクトのディレクトリパス</label>
-              <div className="input-group">
+            {/* 1. ユーザー指示領域 */}
+            <div className={`card ${appState !== "init" ? "inactive" : ""}`}>
+              <h3>1. ユーザー指示</h3>
+              <div className="form-group">
+                <label>対象プロジェクトのディレクトリパス</label>
+                <div className="input-group">
+                  <input
+                    type="text"
+                    value={targetDir}
+                    onChange={(e) => setTargetDir(e.target.value)}
+                    placeholder="/path/to/your/project"
+                  />
+                  <button onClick={handleSelectDirectory}>フォルダを選択</button>
+                </div>
+              </div>
+              <div className="form-group">
+                <label>対象ファイル（複数ある場合はスペース区切り。空欄でも可）</label>
                 <input
                   type="text"
-                  value={targetDir}
-                  onChange={(e) => setTargetDir(e.target.value)}
-                  placeholder="/path/to/your/project"
+                  value={files}
+                  onChange={(e) => setFiles(e.target.value)}
+                  placeholder="src/main.rs src/lib.rs"
                 />
-                <button onClick={handleSelectDirectory}>フォルダを選択</button>
               </div>
-            </div>
-            <div className="form-group">
-              <label>対象ファイル（複数ある場合はスペース区切り。空欄でも可）</label>
-              <input
-                type="text"
-                value={files}
-                onChange={(e) => setFiles(e.target.value)}
-                placeholder="src/main.rs src/lib.rs"
-              />
-            </div>
-            <div className="form-group">
-              <label>チャット言語 (Aiderの思考・返答言語)</label>
-              <input
-                type="text"
-                value={chatLanguage}
-                onChange={(e) => setChatLanguage(e.target.value)}
-                placeholder="Japanese, English など（空欄でOS設定に従う）"
-              />
-            </div>
-            <div className="form-group">
-              <label>操作モード</label>
-              <div className="mode-selector">
-                <label>
-                  <input
-                    type="radio"
-                    value="edit"
-                    checked={mode === 'edit'}
-                    onChange={() => setMode('edit')}
-                  />
-                  コードを修正する (Edit)
-                </label>
-                <label>
-                  <input
-                    type="radio"
-                    value="ask"
-                    checked={mode === 'ask'}
-                    onChange={() => setMode('ask')}
-                  />
-                  リポジトリについて質問する (Ask)
-                </label>
+              <div className="form-group">
+                <label>チャット言語 (Aiderの思考・返答言語)</label>
+                <input
+                  type="text"
+                  value={chatLanguage}
+                  onChange={(e) => setChatLanguage(e.target.value)}
+                  placeholder="Japanese, English など（空欄でOS設定に従う）"
+                />
               </div>
+              <div className="form-group">
+                <label>操作モード</label>
+                <div className="mode-selector">
+                  <label>
+                    <input
+                      type="radio"
+                      value="edit"
+                      checked={mode === 'edit'}
+                      onChange={() => setMode('edit')}
+                    />
+                    コードを修正する (Edit)
+                  </label>
+                  <label>
+                    <input
+                      type="radio"
+                      value="ask"
+                      checked={mode === 'ask'}
+                      onChange={() => setMode('ask')}
+                    />
+                    リポジトリについて質問する (Ask)
+                  </label>
+                </div>
+              </div>
+              <div className="form-group">
+                <label>Aiderへの指示</label>
+                <textarea
+                  value={instruction}
+                  onChange={(e) => setInstruction(e.target.value)}
+                  placeholder="〇〇のバグを直して..."
+                />
+              </div>
+              <button onClick={handleLaunchAider}>
+                Aiderをバックグラウンドで実行
+              </button>
             </div>
-            <div className="form-group">
-              <label>Aiderへの指示</label>
-              <textarea
-                value={instruction}
-                onChange={(e) => setInstruction(e.target.value)}
-                placeholder="〇〇のバグを直して..."
-              />
+
+            {/* 2. LLMへの指示領域 */}
+            <div className={`card ${appState !== "pending" ? "inactive" : ""}`}>
+              <h3>2. LLMへの指示 (Aider -&gt; LLM)</h3>
+              {promptData ? (
+                <div className="prompt-content">
+                  <div className="info-box">
+                    <h4>コンテキストファイル</h4>
+                    <div className="draggable-file-wrapper">
+                      <div
+                        className="draggable-file"
+                        draggable={true}
+                        onDragStart={handleDragFile}
+                      >
+                        <svg width="64" height="80" viewBox="0 0 100 120" xmlns="http://www.w3.org/2000/svg">
+                          <path d="M0 4C0 1.8 1.8 0 4 0H65L100 35V116C100 118.2 98.2 120 96 120H4C1.8 120 0 118.2 0 116V4Z" fill="#CF84E1" />
+                          <path d="M65 0V31C65 33.2 66.8 35 69 35H100L65 0Z" fill="#B463C8" />
+                          <text x="50" y="78" fill="white" fontSize="36" fontFamily="monospace" textAnchor="middle" fontWeight="bold">&lt;/&gt;</text>
+                        </svg>
+                        <span className="file-name">context.xml</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="info-box">
+                    <h4>プロンプト</h4>
+                    <div className="prompt-display">
+                      <pre>{promptData.prompt}</pre>
+                      <button onClick={handleCopyToClipboard}>コピー</button>
+                    </div>
+                  </div>
+                </div>
+              ) : appState === "idle" ? (
+                <p className="placeholder-text">⏳ Aiderがコンテキストを生成しています...</p>
+              ) : (
+                <p className="placeholder-text">Aiderを実行すると、ここにプロンプトが生成されます。</p>
+              )}
             </div>
-            <button onClick={handleLaunchAider}>
-              Aiderをバックグラウンドで実行
-            </button>
-          </div>
-        )}
 
-        {appState === "idle" && (
-          <div className="idle-container">
-            <h2>待機中 (Idle)</h2>
-            <p>Aiderからのリクエストを待っています...</p>
-          </div>
-        )}
-
-        {appState === "pending" && promptData && (
-          <div className="pending-container">
-            <h2>入力待ち (Pending)</h2>
-
-            <div className="info-box">
-              <h3>コンテキストファイル</h3>
-              <div className="draggable-file-wrapper">
-                <div
-                  className="draggable-file"
-                  draggable={true}
-                  onDragStart={handleDragFile}
-                >
-                  <svg width="64" height="80" viewBox="0 0 100 120" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M0 4C0 1.8 1.8 0 4 0H65L100 35V116C100 118.2 98.2 120 96 120H4C1.8 120 0 118.2 0 116V4Z" fill="#CF84E1" />
-                    <path d="M65 0V31C65 33.2 66.8 35 69 35H100L65 0Z" fill="#B463C8" />
-                    <text x="50" y="78" fill="white" fontSize="36" fontFamily="monospace" textAnchor="middle" fontWeight="bold">&lt;/&gt;</text>
-                  </svg>
-                  <span className="file-name">context.xml</span>
+            {/* 3. LLMからの指示領域 */}
+            <div className={`card ${appState !== "pending" ? "inactive" : ""}`}>
+              <h3>3. LLMからの指示 (LLM -&gt; Aider)</h3>
+              <div className="response-content">
+                <textarea
+                  value={aiResponse}
+                  onChange={(e) => setAiResponse(e.target.value)}
+                  placeholder="ここにAIの返答を貼り付けてください..."
+                  disabled={appState !== "pending"}
+                />
+                <div className="button-group">
+                  <button onClick={handleReturnToAider} disabled={appState !== "pending"}>Aiderに返す</button>
+                  <button onClick={handleSkip} disabled={appState !== "pending"}>スキップして適当に返す</button>
                 </div>
               </div>
             </div>
-
-            <div className="info-box">
-              <h3>プロンプト</h3>
-              <div className="prompt-display">
-                <pre>{promptData.prompt}</pre>
-                <button onClick={handleCopyToClipboard}>コピー</button>
-              </div>
-            </div>
-
-            <div className="response-box">
-              <h3>AIからの返答 (SEARCH/REPLACE)</h3>
-              <textarea
-                value={aiResponse}
-                onChange={(e) => setAiResponse(e.target.value)}
-                placeholder="ここにAIの返答を貼り付けてください..."
-              />
-              <div className="button-group">
-                <button onClick={handleReturnToAider}>Aiderに返す</button>
-                <button onClick={handleSkip}>スキップして適当に返す</button>
-              </div>
-            </div>
-          </div>
-        )}
           </>
         )}
       </div>
