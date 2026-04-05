@@ -141,31 +141,48 @@ button {
   }
 }
 
-.app-layout {
+.app-container {
   display: flex;
-  flex-direction: row;
+  flex-direction: column;
   height: 100vh;
   width: 100vw;
-  overflow: hidden;
   background-color: #f6f6f6;
+  overflow: hidden;
 }
-
-.main-pane {
+.status-header {
+  flex-shrink: 0;
+  padding: 1em 2em;
+  background-color: #ffffff;
+  border-bottom: 1px solid #ddd;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.stepper {
+  display: flex;
+  gap: 1em;
+  font-weight: bold;
+  color: #aaa;
+}
+.stepper .active {
+  color: #396cd8;
+}
+.main-content {
   flex: 1;
   padding: 2em;
   overflow-y: auto;
-  min-width: 450px;
+  display: flex;
+  flex-direction: column;
 }
-
-.terminal-pane {
-  width: 40%;
-  min-width: 300px;
-  max-width: 500px;
+.bottom-terminal {
+  flex-shrink: 0;
+  height: 35%;
+  min-height: 250px;
   background-color: #1e1e1e;
+  border-top: 2px solid #333;
   display: flex;
   flex-direction: column;
   padding: 1em;
-  border-left: 1px solid #333;
 }
 
 .card {
@@ -332,10 +349,6 @@ button {
   margin-bottom: 1em;
 }
 
-.debug-files {
-  padding-top: 0.5em;
-}
-
 .draggable-file-wrapper {
   text-align: center;
   padding: 0.5em 0;
@@ -424,8 +437,12 @@ button {
   }
   .file-name { color: #f6f6f6; }
 
-  .app-layout {
+  .app-container {
     background-color: #2f2f2f;
+  }
+  .status-header {
+    background-color: #2a2a2a;
+    border-bottom-color: #333;
   }
 
   .settings-button:hover {

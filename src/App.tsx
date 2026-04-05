@@ -110,6 +110,12 @@ function App() {
     }
   };
 
+  const handleReset = () => {
+    setAppState("init");
+    setPromptData(null);
+    setAiResponse("");
+  };
+
   const sendResponseToAider = async (response: string) => {
     if (promptData?.request_id) {
       setLogs(prev => [...prev, `--- PromptProxy: Sending response to Aider [${new Date().toLocaleTimeString()}] ---`]);
@@ -348,6 +354,18 @@ function App() {
                           <text x="50" y="78" fill="white" fontSize="36" fontFamily="monospace" textAnchor="middle" fontWeight="bold">&lt;/&gt;</text>
                         </svg>
                         <span className="file-name">context.xml</span>
+                      </div>
+                      <div
+                        className="draggable-file"
+                        draggable={true}
+                        onDragStart={handleDragJsonFile}
+                      >
+                        <svg width="64" height="80" viewBox="0 0 100 120" xmlns="http://www.w3.org/2000/svg">
+                          <path d="M0 4C0 1.8 1.8 0 4 0H65L100 35V116C100 118.2 98.2 120 96 120H4C1.8 120 0 118.2 0 116V4Z" fill="#84A8E1" />
+                          <path d="M65 0V31C65 33.2 66.8 35 69 35H100L65 0Z" fill="#6388C8" />
+                          <text x="50" y="82" fill="white" fontSize="30" fontFamily="monospace" textAnchor="middle" fontWeight="bold">JSON</text>
+                        </svg>
+                        <span className="file-name">aider_payload.json</span>
                       </div>
                     </div>
                   </div>
