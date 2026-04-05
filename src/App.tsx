@@ -210,9 +210,16 @@ function App() {
   };
 
   return (
-    <main className="app-layout">
-      {/* 左側：メインの操作領域 */}
-      <div className="main-pane">
+    <div className="app-container">
+      <header className="status-header">
+        <div className="stepper">
+          <span className={appState === "init" ? "active" : ""}>1. ユーザー指示</span> ＞ 
+          <span className={appState === "idle" ? "active" : ""}>2. Aider実行中</span> ＞ 
+          <span className={appState === "pending" ? "active" : ""}>3. LLMプロキシ応答</span>
+        </div>
+        <button onClick={handleReset} style={{ backgroundColor: "#ff4d4f", color: "white" }}>最初から始める</button>
+      </header>
+      <main className="main-content">
         <div className="main-header">
           <h1>LLM Prompt Proxy</h1>
           <button className="settings-button" onClick={() => setShowSettings(true)}>⚙️ 設定</button>
@@ -402,34 +409,17 @@ function App() {
             </div>
           </>
         )}
-      </div>
+      </main>
 
-      {/* 右側：ターミナルとデバッグ領域（常時表示） */}
-      <div className="terminal-pane">
+      <footer className="bottom-terminal">
         <div className="terminal-log">
           {logs.map((log, index) => (
             <div key={index}>{log}</div>
           ))}
           <div ref={messagesEndRef} />
         </div>
-        {promptData && (
-          <div className="debug-files">
-            <div
-              className="draggable-file"
-              draggable={true}
-              onDragStart={handleDragJsonFile}
-            >
-              <svg width="64" height="80" viewBox="0 0 100 120" xmlns="http://www.w3.org/2000/svg">
-                <path d="M0 4C0 1.8 1.8 0 4 0H65L100 35V116C100 118.2 98.2 120 96 120H4C1.8 120 0 118.2 0 116V4Z" fill="#84A8E1" />
-                <path d="M65 0V31C65 33.2 66.8 35 69 35H100L65 0Z" fill="#6388C8" />
-                <text x="50" y="82" fill="white" fontSize="30" fontFamily="monospace" textAnchor="middle" fontWeight="bold">JSON</text>
-              </svg>
-              <span className="file-name">aider_payload.json</span>
-            </div>
-          </div>
-        )}
-      </div>
-    </main>
+      </footer>
+    </div>
   );
 }
 

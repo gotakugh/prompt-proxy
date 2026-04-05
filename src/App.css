@@ -352,6 +352,9 @@ button {
 .draggable-file-wrapper {
   text-align: center;
   padding: 0.5em 0;
+  display: flex;
+  justify-content: center;
+  gap: 1em;
 }
 
 .prompt-display {
