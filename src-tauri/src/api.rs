@@ -391,6 +391,7 @@ pub async fn start_api_server(
     state: tauri::State<'_, AppState>,
     app_handle: tauri::AppHandle,
 ) -> Result<(), String> {
+    state.pending_requests.lock().await.clear();
     let mut server_tx = state.server_tx.lock().await;
     if let Some(tx) = server_tx.take() {
         let _ = tx.send(());

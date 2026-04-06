@@ -64,6 +64,11 @@ function App() {
     }
   }, []);
 
+  // Reset backend state on component mount (e.g., page refresh)
+  useEffect(() => {
+    invoke("reset_aider_state").catch(console.error);
+  }, []);
+
   // Sync settings with backend and save to localStorage on change
   useEffect(() => {
     const settingsToSave = { useCustomPrompt, customEditPrompt, customAskPrompt };
@@ -124,7 +129,8 @@ function App() {
     }
   };
 
-  const handleReset = () => {
+  const handleReset = async () => {
+    await invoke("reset_aider_state");
     setAppState("init");
     setPromptData(null);
     setAiResponse("");

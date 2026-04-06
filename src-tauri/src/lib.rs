@@ -115,6 +115,21 @@ pub fn spawn_aider_process(app_handle: &tauri::AppHandle, target_dir: String, fi
     }
 }
 
+#[tauri::command]
+pub async fn reset_aider_state(
+    app_state: tauri::State<'_, crate::api::AppState>,
+    process_state: tauri::State<'_, AiderProcessState>,
+) -> Result<(), String> {
+    println!("=> [PromptProxy] Resetting system state and killing Aider processes...");
+    app_state.pending_requests.lock().await.clear();
+    let mut processes = process_state.0.lock().unwrap();
+    for mut child in processes.drain(..) {
+        let _ = child.kill();
+        let _ = child.wait();
+    }
+    Ok(())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let app = tauri::Builder::default()
@@ -142,7 +157,8 @@ pub fn run() {
             api::respond_to_llm_request,
             launch_aider_batch,
             api::update_prompt_settings,
-            api::start_api_server
+            api::start_api_server,
+            reset_aider_state
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application");
