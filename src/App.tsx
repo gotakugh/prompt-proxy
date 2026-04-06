@@ -21,7 +21,7 @@ function App() {
   const [targetDir, setTargetDir] = useState("");
   const [files, setFiles] = useState("");
   const [instruction, setInstruction] = useState("");
-  const [chatLanguage, setChatLanguage] = useState(() => localStorage.getItem("chatLanguage") || "Japanese");
+  const [chatLanguage, setChatLanguage] = useState(() => localStorage.getItem("chatLanguage") || "English");
   const [promptData, setPromptData] = useState<PromptPayload | null>(null);
   const [aiResponse, setAiResponse] = useState("");
   const [logs, setLogs] = useState<string[]>([]);
@@ -31,16 +31,16 @@ function App() {
   const [showSettings, setShowSettings] = useState(false);
   const [useCustomPrompt, setUseCustomPrompt] = useState(false);
   const [customEditPrompt, setCustomEditPrompt] = useState(
-    "添付された context.xml を読み込み、コンテキストを理解した上で、以下の指示に従ってコードを修正してください。\n\n" +
-    "=== 指示内容 ===\n{instruction}\n================\n\n" +
-    "【重要】出力フォーマットの厳守：\n" +
-    "1. 挨拶や解説などのテキストは一切省いてください。\n" +
-    "2. 出力全体をマークダウンのコードブロック（```）で囲んでください。\n" +
-    "3. ブロックの先頭には必ず「対象のファイルパス」を単独の行で記述してください。\n" +
-    "4. 修正に必要なファイルが不足していると判断した場合のみ、絶対に他のテキストを含めず `[ADD_FILE: ファイルパス]` という書式のみを出力すること。"
+    "Read the attached context.xml, understand the context, and modify the code according to the instructions below.\n\n" +
+    "=== Instructions ===\n{instruction}\n================\n\n" +
+    "[IMPORTANT] Strict Output Format:\n" +
+    "1. Omit all greetings and explanations.\n" +
+    "2. Wrap the entire output in a markdown code block.\n" +
+    "3. You must write the 'target file path' on a single line at the very beginning of the block so Aider can recognize it.\n" +
+    "4. ONLY if you determine that necessary files are missing from context.xml, output ONLY the format [ADD_FILE: file_path] without any other text."
   );
   const [customAskPrompt, setCustomAskPrompt] = useState(
-    "添付された context.xml を読み込み、リポジトリのコンテキストを理解した上で、以下の質問に回答してください。\n\n=== 質問 ===\n{instruction}\n=============="
+    "Read the attached context.xml, understand the repository context, and answer the following question.\n\n=== Question ===\n{instruction}\n=============="
   );
 
   useEffect(() => {
@@ -98,7 +98,7 @@ function App() {
       setAppState("idle");
       setPromptData(null);
       setAiResponse("");
-      setLogs(prev => [...prev, `[PromptProxy] 🔄 ファイルを追加してAiderを再起動しています...`]);
+      setLogs(prev => [...prev, `[PromptProxy] Adding files and restarting Aider...`]);
     });
 
     return () => {
@@ -194,28 +194,28 @@ function App() {
     <div className="app-container">
       <header className="status-header">
         <div className="stepper">
-          <span className={appState === "init" ? "active" : ""}>1. ユーザー指示</span> ＞ 
-          <span className={appState === "idle" ? "active" : ""}>2. Aider実行中</span> ＞ 
-          <span className={appState === "pending" ? "active" : ""}>3. LLMプロキシ応答</span>
+          <span className={appState === "init" ? "active" : ""}>1. User Input</span> ＞ 
+          <span className={appState === "idle" ? "active" : ""}>2. Aider Running</span> ＞ 
+          <span className={appState === "pending" ? "active" : ""}>3. LLM Proxy Response</span>
         </div>
-        <button onClick={handleReset} className="reset-button">🔄 リロード</button>
+        <button onClick={handleReset} className="reset-button">🔄 Reload</button>
       </header>
       <main className="main-content">
         <div className="main-header">
           <h1>LLM Prompt Proxy</h1>
-          <button className="settings-button" onClick={() => setShowSettings(true)}>⚙️ 設定</button>
+          <button className="settings-button" onClick={() => setShowSettings(true)}>⚙️ Settings</button>
         </div>
 
         {showSettings ? (
           <div className="settings-container">
-            <h2>プロンプト設定</h2>
+            <h2>Prompt Settings</h2>
             <div className="form-group">
-              <label>チャット言語 (Aiderの思考・返答言語)</label>
+              <label>Chat Language (Aider's thinking/response language)</label>
               <input
                 type="text"
                 value={chatLanguage}
                 onChange={(e) => setChatLanguage(e.target.value)}
-                placeholder="Japanese, English など（空欄でOS設定に従う）"
+                placeholder="e.g. English, Japanese (Leave blank for OS default)"
               />
             </div>
             <div className="form-group">
@@ -226,7 +226,7 @@ function App() {
                     checked={!useCustomPrompt}
                     onChange={() => setUseCustomPrompt(false)}
                   />
-                  ツールのデフォルト設定を使用
+                  Use tool's default settings
                 </label>
                 <label>
                   <input
@@ -234,7 +234,7 @@ function App() {
                     checked={useCustomPrompt}
                     onChange={() => setUseCustomPrompt(true)}
                   />
-                  カスタムプロンプトを使用
+                  Use custom prompts
                 </label>
               </div>
             </div>
@@ -242,32 +242,32 @@ function App() {
             {useCustomPrompt && (
               <>
                 <div className="form-group">
-                  <label>コード修正(Edit)用プロンプト</label>
+                  <label>Prompt for Code Edit (Edit)</label>
                   <textarea
                     value={customEditPrompt}
                     onChange={(e) => setCustomEditPrompt(e.target.value)}
                   />
-                  <p className="prompt-hint">※ユーザーの指示は {`{instruction}`} の部分に挿入されます</p>
+                  <p className="prompt-hint">* User instruction will be inserted at {`{instruction}`}</p>
                 </div>
                 <div className="form-group">
-                  <label>リポジトリ質問(Ask)用プロンプト</label>
+                  <label>Prompt for Repository Q&A (Ask)</label>
                   <textarea
                     value={customAskPrompt}
                     onChange={(e) => setCustomAskPrompt(e.target.value)}
                   />
-                  <p className="prompt-hint">※ユーザーの指示は {`{instruction}`} の部分に挿入されます</p>
+                  <p className="prompt-hint">* User instruction will be inserted at {`{instruction}`}</p>
                 </div>
               </>
             )}
-            <button onClick={() => setShowSettings(false)}>設定を閉じる</button>
+            <button onClick={() => setShowSettings(false)}>Close Settings</button>
           </div>
         ) : (
           <>
             {/* 1. ユーザー指示領域 */}
             <div className={`card ${appState !== "init" ? "inactive" : ""}`}>
-              <h3>1. ユーザー指示</h3>
+              <h3>1. User Input</h3>
               <div className="form-group">
-                <label>対象プロジェクトのディレクトリパス</label>
+                <label>Target Project Directory</label>
                 <div className="input-group">
                   <input
                     type="text"
@@ -275,11 +275,11 @@ function App() {
                     onChange={(e) => setTargetDir(e.target.value)}
                     placeholder="/path/to/your/project"
                   />
-                  <button onClick={handleSelectDirectory}>フォルダを選択</button>
+                  <button onClick={handleSelectDirectory}>Select Folder</button>
                 </div>
               </div>
               <div className="form-group">
-                <label>対象ファイル（複数ある場合はスペース区切り。空欄でも可）</label>
+                <label>Target Files (Space-separated for multiple. Can be blank)</label>
                 <input
                   type="text"
                   value={files}
@@ -288,7 +288,7 @@ function App() {
                 />
               </div>
               <div className="form-group">
-                <label>操作モード</label>
+                <label>Operation Mode</label>
                 <div className="mode-selector">
                   <label>
                     <input
@@ -297,7 +297,7 @@ function App() {
                       checked={mode === 'edit'}
                       onChange={() => setMode('edit')}
                     />
-                    コードを修正する (Edit)
+                    Edit Code (Edit)
                   </label>
                   <label>
                     <input
@@ -306,30 +306,30 @@ function App() {
                       checked={mode === 'ask'}
                       onChange={() => setMode('ask')}
                     />
-                    リポジトリについて質問する (Ask)
+                    Ask about Repository (Ask)
                   </label>
                 </div>
               </div>
               <div className="form-group">
-                <label>Aiderへの指示</label>
+                <label>Instructions for Aider</label>
                 <textarea
                   value={instruction}
                   onChange={(e) => setInstruction(e.target.value)}
-                  placeholder="〇〇のバグを直して..."
+                  placeholder="Fix the bug in..."
                 />
               </div>
               <button onClick={handleLaunchAider}>
-                Aiderをバックグラウンドで実行
+                Run Aider in Background
               </button>
             </div>
 
             {/* 2. LLMへの指示領域 */}
             <div className={`card ${appState !== "pending" ? "inactive" : ""}`}>
-              <h3>2. LLMへの指示 (Aider -&gt; LLM)</h3>
+              <h3>2. Instructions for LLM (Aider -&gt; LLM)</h3>
               {promptData ? (
                 <div className="prompt-content">
                   <div className="info-box">
-                    <h4>コンテキストファイル</h4>
+                    <h4>Context File</h4>
                     <div className="draggable-file-wrapper">
                       <div
                         className="draggable-file"
@@ -346,33 +346,33 @@ function App() {
                     </div>
                   </div>
                   <div className="info-box">
-                    <h4>プロンプト</h4>
+                    <h4>Prompt</h4>
                     <div className="prompt-display">
                       <pre>{promptData.prompt}</pre>
-                      <button onClick={handleCopyToClipboard}>コピー</button>
+                      <button onClick={handleCopyToClipboard}>Copy</button>
                     </div>
                   </div>
                 </div>
               ) : appState === "idle" ? (
-                <p className="placeholder-text">⏳ Aiderがコンテキストを生成しています...</p>
+                <p className="placeholder-text">⏳ Aider is generating context...</p>
               ) : (
-                <p className="placeholder-text">Aiderを実行すると、ここにプロンプトが生成されます。</p>
+                <p className="placeholder-text">Prompt will be generated here when Aider runs.</p>
               )}
             </div>
 
             {/* 3. LLMからの指示領域 */}
             <div className={`card ${appState !== "pending" ? "inactive" : ""}`}>
-              <h3>3. LLMからの指示 (LLM -&gt; Aider)</h3>
+              <h3>3. Response from LLM (LLM -&gt; Aider)</h3>
               <div className="response-content">
                 <textarea
                   value={aiResponse}
                   onChange={(e) => setAiResponse(e.target.value)}
-                  placeholder="ここにAIの返答を貼り付けてください..."
+                  placeholder="Paste AI response here..."
                   disabled={appState !== "pending"}
                 />
                 <div className="button-group">
-                  <button onClick={handleReturnToAider} disabled={appState !== "pending"}>Aiderに返す</button>
-                  <button onClick={handleSkip} disabled={appState !== "pending"}>スキップして適当に返す</button>
+                  <button onClick={handleReturnToAider} disabled={appState !== "pending"}>Return to Aider</button>
+                  <button onClick={handleSkip} disabled={appState !== "pending"}>Skip and return dummy response</button>
                 </div>
               </div>
             </div>

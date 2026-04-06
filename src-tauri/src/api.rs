@@ -58,7 +58,7 @@ async fn chat_completions_handler(
     State(app_handle): State<AppHandle>,
     Json(payload): Json<Value>,
 ) -> impl IntoResponse {
-    println!("=> [PromptProxy] リクエストを受信しました");
+    println!("=> [PromptProxy] Request received");
     let request_id = Uuid::new_v4().to_string();
     let (tx, rx) = oneshot::channel::<String>();
 
@@ -133,10 +133,10 @@ async fn chat_completions_handler(
 
     let xml_string = format!(
         "<instructions>\n\
-         このファイルは、対象プロジェクトのソースコードとリポジトリ全体のコンテキストをXML形式でまとめたものです。\n\
-         - <repository> タグ内には、リポジトリの構造や重要なルールが含まれています。\n\
-         - <file path=\"...\"> タグ内には、各ファイルの実コードが含まれています。\n\
-         別途提供されるユーザーの指示に従い、このコンテキストを参照してコードの修正を行ってください。\n\
+        This file contains the source code of the target project and the overall repository context in XML format.\n\
+        - The repository tag contains repository structure and important rules.\n\
+        - The file path tag contains the actual code of each file.\n\
+        Please modify the code referring to this context according to the user instructions provided separately.\n\
          </instructions>\n\n\
          <repository><![CDATA[{}]]></repository>\n{}",
         repo_info, files_xml
@@ -238,26 +238,19 @@ async fn chat_completions_handler(
         template.replace("{instruction}", &user_instruction)
     } else {
         let format_instruction = if expects_edit {
-            "【重要】出力フォーマットの厳守：\n\
-     1. 挨拶や解説などのテキストは一切省いてください。\n\
-     2. 出力全体をマークダウンのコードブロック（```）で囲んでください。\n\
-     3. Aiderが認識できるように、ブロックの先頭には必ず「対象のファイルパス」を単独の行で記述してください。\n\
-     4. 修正に必要なファイルが context.xml 内に不足していると判断した場合のみ、絶対に他のテキストを含めず `[ADD_FILE: ファイルパス]` という書式のみを出力すること。\n\n\
-     【出力フォーマット例】\n\
-     ```\n\
-     path/to/file.rs\n\
-     <<<<<<< SEARCH\n\
-     修正前のコード\n\
-     =======\n\
-     修正後のコード\n\
-     >>>>>>> REPLACE\n\
-     ```"
+            "[IMPORTANT] Strict Output Format:\n\
+     1. Omit all greetings and explanations.\n\
+     2. Wrap the entire output in a markdown code block.\n\
+     3. You must write the 'target file path' on a single line at the very beginning of the block so Aider can recognize it.\n\
+     4. ONLY if you determine that necessary files are missing from context.xml, output ONLY the format [ADD_FILE: file_path] without any other text.\n\n\
+     [Output Format Example]\n\
+     (Write the target file path, and below it, use the format with <<<<<<< SEARCH, =======, and >>>>>>> REPLACE blocks)"
         } else {
-            "【重要】ユーザーからの質問に対する回答を、自然なテキストで出力してください（コード修正フォーマットは不要です）。"
+            "[IMPORTANT] Please output the answer to the user's question in natural text (code modification format is not required)."
         };
         format!(
-            "添付された `context.xml` を読み込み、コンテキストを理解した上で、以下の指示に対応してください。\n\n\
-             === 指示内容 ===\n\
+            "Read the attached context.xml, understand the context, and answer/execute the following instructions.\n\n\
+             === Instructions ===\n\
              {}\n\
              ================\n\n\
              {}",
@@ -265,7 +258,7 @@ async fn chat_completions_handler(
         )
     };
 
-    println!("=> [PromptProxy] XMLとプロンプトの生成が完了しました");
+    println!("=> [PromptProxy] XML and prompt generation completed");
 
     // 4. Emit data to frontend
     #[derive(Clone, serde::Serialize)]
@@ -286,12 +279,12 @@ async fn chat_completions_handler(
 
     app_handle.emit("prompt_received", &prompt_payload).unwrap();
 
-    println!("=> [PromptProxy] フロントエンドにイベントを送信し、待機を開始します...");
+    println!("=> [PromptProxy] Event sent to frontend, waiting for response...");
 
     // Wait for the frontend to respond via the `respond_to_llm_request` command
     match rx.await {
         Ok(response_content) => {
-            println!("=> [PromptProxy] フロントエンドから返答を受け取りました");
+            println!("=> [PromptProxy] Response received from frontend");
             let completion = OpenAIChatCompletion {
                 id: "chatcmpl-dummy".to_string(),
                 object: "chat.completion".to_string(),
@@ -311,7 +304,7 @@ async fn chat_completions_handler(
                     total_tokens: 0,
                 },
             };
-            println!("=> [PromptProxy] Aiderへレスポンスを返却します");
+            println!("=> [PromptProxy] Returning response to Aider");
             Json(completion).into_response()
         }
         Err(_) => {
@@ -332,14 +325,14 @@ pub async fn respond_to_llm_request(
     session_state: tauri::State<'_, crate::AiderSessionState>,
     app_handle: tauri::AppHandle,
 ) -> Result<(), String> {
-    println!("=> [PromptProxy] Reactから受信したテキスト: {}", response);
+    println!("=> [PromptProxy] Text received from React: {}", response);
 
     if response.contains("[ADD_FILE:") {
         if let Some(start) = response.find("[ADD_FILE:") {
             let start = start + "[ADD_FILE:".len();
             if let Some(end) = response[start..].find(']') {
                 let file_path = response[start..start + end].trim();
-                println!("=> [PromptProxy] AIがファイルの追加を要求しました: {}", file_path);
+                println!("=> [PromptProxy] AI requested adding file: {}", file_path);
 
                 if let Some(tx) = state.pending_requests.lock().await.remove(&request_id) {
                     let _ = tx.send("Understood. Restarting with the requested file.".to_string());
@@ -383,7 +376,7 @@ pub async fn update_prompt_settings(
     settings: PromptSettings,
     state: tauri::State<'_, AppState>,
 ) -> Result<(), String> {
-    println!("=> [PromptProxy] 設定を更新しました: {:?}", settings);
+    println!("=> [PromptProxy] Settings updated: {:?}", settings);
     let mut current_settings = state.prompt_settings.lock().await;
     *current_settings = settings;
     Ok(())
