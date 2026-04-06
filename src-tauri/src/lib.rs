@@ -13,6 +13,8 @@ pub struct AiderSession {
     pub files: String,
     pub message: String,
     pub chat_language: String,
+    pub aider_path: String,
+    pub api_port: u16,
 }
 pub struct AiderSessionState(pub Mutex<Option<AiderSession>>);
 
@@ -28,6 +30,8 @@ fn launch_aider_batch(
     files: String,
     message: String,
     chat_language: String,
+    aider_path: String,
+    api_port: u16,
     app_handle: tauri::AppHandle,
     session_state: tauri::State<'_, AiderSessionState>,
 ) {
@@ -37,14 +41,16 @@ fn launch_aider_batch(
         files: files.clone(),
         message: message.clone(),
         chat_language: chat_language.clone(),
+        aider_path: aider_path.clone(),
+        api_port,
     };
     *session_state.0.lock().unwrap() = Some(session);
 
-    spawn_aider_process(&app_handle, target_dir, files, message, chat_language);
+    spawn_aider_process(&app_handle, target_dir, files, message, chat_language, aider_path, api_port);
 }
 
-pub fn spawn_aider_process(app_handle: &tauri::AppHandle, target_dir: String, files: String, message: String, chat_language: String) {
-    let mut command = Command::new("aider");
+pub fn spawn_aider_process(app_handle: &tauri::AppHandle, target_dir: String, files: String, message: String, chat_language: String, aider_path: String, api_port: u16) {
+    let mut command = Command::new(&aider_path);
     command.current_dir(&target_dir);
 
     if !files.trim().is_empty() {
@@ -55,7 +61,7 @@ pub fn spawn_aider_process(app_handle: &tauri::AppHandle, target_dir: String, fi
 
     command.args([
         "--openai-api-base",
-        "http://localhost:8080/v1",
+        &format!("http://localhost:{}/v1", api_port),
         "--openai-api-key",
         "dummy",
         "--model",
@@ -117,8 +123,16 @@ pub fn run() {
             // Manage the state for background processes
             app.manage(AiderProcessState(Mutex::new(Vec::new())));
             app.manage(AiderSessionState(Mutex::new(None)));
-            // Start the API server in a background task
-            api::init(&app.handle());
+            // Manually initialize AppState
+            app.manage(crate::api::AppState {
+                pending_requests: std::sync::Arc::new(tokio::sync::Mutex::new(std::collections::HashMap::new())),
+                prompt_settings: std::sync::Arc::new(tokio::sync::Mutex::new(crate::api::PromptSettings {
+                    use_custom: false,
+                    custom_edit_prompt: String::new(),
+                    custom_ask_prompt: String::new(),
+                })),
+                server_tx: std::sync::Arc::new(tokio::sync::Mutex::new(None)),
+            });
             Ok(())
         })
         .plugin(tauri_plugin_opener::init())
@@ -127,7 +141,8 @@ pub fn run() {
             greet,
             api::respond_to_llm_request,
             launch_aider_batch,
-            api::update_prompt_settings
+            api::update_prompt_settings,
+            api::start_api_server
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application");

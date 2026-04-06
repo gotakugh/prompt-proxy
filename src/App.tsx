@@ -5,6 +5,16 @@ import { open } from "@tauri-apps/plugin-dialog";
 import { startDrag } from "@crabnebula/tauri-plugin-drag";
 import "./App.css";
 
+const DEFAULT_EDIT_PROMPT = "Read the attached context.xml, understand the context, and modify the code according to the instructions below.\n\n" +
+  "=== Instructions ===\n{instruction}\n================\n\n" +
+  "[IMPORTANT] Strict Output Format:\n" +
+  "1. Omit all greetings and explanations.\n" +
+  "2. Wrap the entire output in a markdown code block.\n" +
+  "3. You must write the 'target file path' on a single line at the very beginning of the block so Aider can recognize it.\n" +
+  "4. ONLY if you determine that necessary files are missing from context.xml, output ONLY the format [ADD_FILE: file_path] without any other text.";
+
+const DEFAULT_ASK_PROMPT = "Read the attached context.xml, understand the repository context, and answer the following question.\n\n=== Question ===\n{instruction}\n==============";
+
 type AppState = "init" | "idle" | "pending";
 
 interface PromptPayload {
@@ -22,6 +32,8 @@ function App() {
   const [files, setFiles] = useState("");
   const [instruction, setInstruction] = useState("");
   const [chatLanguage, setChatLanguage] = useState(() => localStorage.getItem("chatLanguage") || "English");
+  const [aiderPath, setAiderPath] = useState(() => localStorage.getItem("aiderPath") || "aider");
+  const [apiPort, setApiPort] = useState(() => Number(localStorage.getItem("apiPort") || 8080));
   const [promptData, setPromptData] = useState<PromptPayload | null>(null);
   const [aiResponse, setAiResponse] = useState("");
   const [logs, setLogs] = useState<string[]>([]);
@@ -30,18 +42,8 @@ function App() {
   // Settings states
   const [showSettings, setShowSettings] = useState(false);
   const [useCustomPrompt, setUseCustomPrompt] = useState(false);
-  const [customEditPrompt, setCustomEditPrompt] = useState(
-    "Read the attached context.xml, understand the context, and modify the code according to the instructions below.\n\n" +
-    "=== Instructions ===\n{instruction}\n================\n\n" +
-    "[IMPORTANT] Strict Output Format:\n" +
-    "1. Omit all greetings and explanations.\n" +
-    "2. Wrap the entire output in a markdown code block.\n" +
-    "3. You must write the 'target file path' on a single line at the very beginning of the block so Aider can recognize it.\n" +
-    "4. ONLY if you determine that necessary files are missing from context.xml, output ONLY the format [ADD_FILE: file_path] without any other text."
-  );
-  const [customAskPrompt, setCustomAskPrompt] = useState(
-    "Read the attached context.xml, understand the repository context, and answer the following question.\n\n=== Question ===\n{instruction}\n=============="
-  );
+  const [customEditPrompt, setCustomEditPrompt] = useState(DEFAULT_EDIT_PROMPT);
+  const [customAskPrompt, setCustomAskPrompt] = useState(DEFAULT_ASK_PROMPT);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -66,6 +68,8 @@ function App() {
   useEffect(() => {
     const settingsToSave = { useCustomPrompt, customEditPrompt, customAskPrompt };
     localStorage.setItem("promptSettings", JSON.stringify(settingsToSave));
+    localStorage.setItem("aiderPath", aiderPath);
+    localStorage.setItem("apiPort", String(apiPort));
 
     const settingsForRust = {
       use_custom: useCustomPrompt,
@@ -75,7 +79,11 @@ function App() {
     invoke("update_prompt_settings", { settings: settingsForRust }).catch(
       console.error
     );
-  }, [useCustomPrompt, customEditPrompt, customAskPrompt]);
+  }, [useCustomPrompt, customEditPrompt, customAskPrompt, aiderPath, apiPort]);
+
+  useEffect(() => {
+    invoke("start_api_server", { port: Number(apiPort) }).catch(console.error);
+  }, [apiPort]);
 
   useEffect(() => {
     localStorage.setItem("chatLanguage", chatLanguage);
@@ -161,6 +169,8 @@ function App() {
       files,
       message: finalMessage,
       chatLanguage,
+      aiderPath,
+      apiPort: Number(apiPort),
     });
     setAppState("idle");
   };
@@ -209,6 +219,23 @@ function App() {
         {showSettings ? (
           <div className="settings-container">
             <h2>Prompt Settings</h2>
+            <div className="form-group">
+              <label>Aider Path (Executable Path)</label>
+              <input
+                type="text"
+                value={aiderPath}
+                onChange={(e) => setAiderPath(e.target.value)}
+                placeholder="aider"
+              />
+            </div>
+            <div className="form-group">
+              <label>API Port (Proxy Server Port)</label>
+              <input
+                type="number"
+                value={apiPort}
+                onChange={(e) => setApiPort(Number(e.target.value))}
+              />
+            </div>
             <div className="form-group">
               <label>Chat Language (Aider's thinking/response language)</label>
               <input
@@ -259,7 +286,13 @@ function App() {
                 </div>
               </>
             )}
-            <button onClick={() => setShowSettings(false)}>Close Settings</button>
+            <div className="button-group" style={{ marginTop: '1em' }}>
+              <button onClick={() => {
+                setCustomEditPrompt(DEFAULT_EDIT_PROMPT);
+                setCustomAskPrompt(DEFAULT_ASK_PROMPT);
+              }}>Reset to Defaults</button>
+              <button onClick={() => setShowSettings(false)}>Close Settings</button>
+            </div>
           </div>
         ) : (
           <>

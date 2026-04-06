@@ -52,6 +52,7 @@ struct Message {
 pub struct AppState {
     pub pending_requests: Arc<Mutex<HashMap<String, ResponderTx>>>,
     pub prompt_settings: Arc<Mutex<PromptSettings>>,
+    pub server_tx: Arc<Mutex<Option<tokio::sync::oneshot::Sender<()>>>>,
 }
 
 async fn chat_completions_handler(
@@ -351,10 +352,12 @@ pub async fn respond_to_llm_request(
                     let target_dir = session.target_dir.clone();
                     let message = session.message.clone();
                     let chat_language = session.chat_language.clone();
+                    let aider_path = session.aider_path.clone();
+                    let api_port = session.api_port;
 
                     tokio::spawn(async move {
                         tokio::time::sleep(Duration::from_secs(1)).await;
-                        crate::spawn_aider_process(&app_handle, target_dir, new_files, message, chat_language);
+                        crate::spawn_aider_process(&app_handle, target_dir, new_files, message, chat_language, aider_path, api_port);
                     });
                 }
 
@@ -382,19 +385,20 @@ pub async fn update_prompt_settings(
     Ok(())
 }
 
-// This function initializes and runs the Axum server in a background task.
-pub fn init(app_handle: &AppHandle) {
-    // Create and manage our application state
-    let settings = PromptSettings {
-        use_custom: false,
-        custom_edit_prompt: String::new(),
-        custom_ask_prompt: String::new(),
-    };
-    let state = AppState {
-        pending_requests: Arc::new(Mutex::new(HashMap::new())),
-        prompt_settings: Arc::new(Mutex::new(settings)),
-    };
-    app_handle.manage(state);
+#[tauri::command]
+pub async fn start_api_server(
+    port: u16,
+    state: tauri::State<'_, AppState>,
+    app_handle: tauri::AppHandle,
+) -> Result<(), String> {
+    let mut server_tx = state.server_tx.lock().await;
+    if let Some(tx) = server_tx.take() {
+        let _ = tx.send(());
+        println!("API server shutting down...");
+    }
+
+    let (tx, rx) = tokio::sync::oneshot::channel::<()>();
+    *server_tx = Some(tx);
 
     let cors = CorsLayer::new()
         .allow_origin(Any)
@@ -406,12 +410,26 @@ pub fn init(app_handle: &AppHandle) {
         .with_state(app_handle.clone())
         .layer(cors);
 
-    let _server_handle = app_handle.clone();
+    let addr = format!("127.0.0.1:{}", port);
+    let listener = match tokio::net::TcpListener::bind(&addr).await {
+        Ok(l) => l,
+        Err(e) => {
+            let err_msg = format!("Failed to bind to port {}: {}", port, e);
+            eprintln!("{}", err_msg);
+            return Err(err_msg);
+        }
+    };
+    println!("API server listening on {}", addr);
+
     tauri::async_runtime::spawn(async move {
-        let listener = tokio::net::TcpListener::bind("127.0.0.1:8080")
+        axum::serve(listener, app)
+            .with_graceful_shutdown(async {
+                rx.await.ok();
+                println!("API server has been shut down gracefully.");
+            })
             .await
             .unwrap();
-        println!("API server listening on {}", listener.local_addr().unwrap());
-        axum::serve(listener, app).await.unwrap();
     });
+
+    Ok(())
 }
