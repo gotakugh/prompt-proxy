@@ -116,7 +116,7 @@ pub fn spawn_aider_process(app_handle: &tauri::AppHandle, target_dir: String, fi
 }
 
 #[tauri::command]
-pub async fn reset_aider_state(
+async fn reset_aider_state(
     app_state: tauri::State<'_, crate::api::AppState>,
     process_state: tauri::State<'_, AiderProcessState>,
 ) -> Result<(), String> {
