@@ -243,11 +243,9 @@ async fn chat_completions_handler(
      1. Omit all greetings and explanations.\n\
      2. Wrap the entire output in a markdown code block.\n\
      3. You must write the 'target file path' on a single line at the very beginning of the block so Aider can recognize it.\n\
-     4. ONLY if you determine that necessary files are missing from context.xml, output ONLY the format [ADD_FILE: file_path] without any other text.\n\n\
-     [Output Format Example]\n\
-     (Write the target file path, and below it, use the format with <<<<<<< SEARCH, =======, and >>>>>>> REPLACE blocks)"
+     4. ONLY if you determine that necessary files are missing from context.xml, DO NOT output the code block. Instead, tell the user to add the missing file paths to the 'Target Files' input on the UI and try again."
         } else {
-            "[IMPORTANT] Please output the answer to the user's question in natural text (code modification format is not required).\nONLY if you determine that necessary files are missing from context.xml to answer the question, output ONLY the format [ADD_FILE: file_path] without any other text."
+            "[IMPORTANT] Please output the answer to the user's question in natural text (code modification format is not required).\nIf you determine that necessary files are missing from context.xml to answer the question, please tell the user which files are missing and ask them to add those files to the 'Target Files' input and run again."
         };
         format!(
             "Read the attached context.xml, understand the context, and answer/execute the following instructions.\n\n\
@@ -323,49 +321,8 @@ pub async fn respond_to_llm_request(
     request_id: String,
     response: String,
     state: tauri::State<'_, AppState>,
-    session_state: tauri::State<'_, crate::AiderSessionState>,
-    app_handle: tauri::AppHandle,
 ) -> Result<(), String> {
     println!("=> [PromptProxy] Text received from React: {}", response);
-
-    if response.contains("[ADD_FILE:") {
-        if let Some(start) = response.find("[ADD_FILE:") {
-            let start = start + "[ADD_FILE:".len();
-            if let Some(end) = response[start..].find(']') {
-                let file_path = response[start..start + end].trim();
-                println!("=> [PromptProxy] AI requested adding file: {}", file_path);
-
-                if let Some(tx) = state.pending_requests.lock().await.remove(&request_id) {
-                    let _ = tx.send("Understood. Restarting with the requested file.".to_string());
-                }
-
-                if let Some(session) = session_state.0.lock().unwrap().as_mut() {
-                    let mut files: Vec<&str> = session.files.split_whitespace().collect();
-                    if !files.contains(&file_path) {
-                        files.push(file_path);
-                    }
-                    let new_files = files.join(" ");
-                    session.files = new_files.clone();
-
-                    app_handle.emit("file_added_by_ai", &new_files).unwrap();
-
-                    let target_dir = session.target_dir.clone();
-                    let message = session.message.clone();
-                    let chat_language = session.chat_language.clone();
-                    let aider_path = session.aider_path.clone();
-                    let api_port = session.api_port;
-
-                    tokio::spawn(async move {
-                        tokio::time::sleep(Duration::from_secs(1)).await;
-                        crate::spawn_aider_process(&app_handle, target_dir, new_files, message, chat_language, aider_path, api_port);
-                    });
-                }
-
-                return Ok(());
-            }
-        }
-    }
-
     if let Some(tx) = state.pending_requests.lock().await.remove(&request_id) {
         tx.send(response)
             .map_err(|_| "Failed to send response".to_string())

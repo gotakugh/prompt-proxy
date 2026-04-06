@@ -11,9 +11,9 @@ const DEFAULT_EDIT_PROMPT = "Read the attached context.xml, understand the conte
   "1. Omit all greetings and explanations.\n" +
   "2. Wrap the entire output in a markdown code block.\n" +
   "3. You must write the 'target file path' on a single line at the very beginning of the block so Aider can recognize it.\n" +
-  "4. ONLY if you determine that necessary files are missing from context.xml, output ONLY the format [ADD_FILE: file_path] without any other text.";
+  "4. ONLY if you determine that necessary files are missing from context.xml, DO NOT output the code block. Instead, tell the user to add the missing file paths to the 'Target Files' input on the UI and try again.";
 
-const DEFAULT_ASK_PROMPT = "Read the attached context.xml, understand the repository context, and answer the following question.\n\n=== Question ===\n{instruction}\n==============\n\n[IMPORTANT]\nONLY if you determine that necessary files are missing from context.xml to answer the question, output ONLY the format [ADD_FILE: file_path] without any other text.";
+const DEFAULT_ASK_PROMPT = "Read the attached context.xml, understand the repository context, and answer the following question.\n\n=== Question ===\n{instruction}\n==============\n\n[IMPORTANT]\nIf you determine that necessary files are missing from context.xml to answer the question, please tell the user which files are missing and ask them to add those files to the 'Target Files' input and run again.";
 
 type AppState = "init" | "idle" | "pending";
 
@@ -106,18 +106,9 @@ function App() {
       setLogs(prev => [...prev, event.payload]);
     });
 
-    const unlistenFileAdded = listen<string>("file_added_by_ai", (event) => {
-      setFiles(event.payload);
-      setAppState("idle");
-      setPromptData(null);
-      setAiResponse("");
-      setLogs(prev => [...prev, `[PromptProxy] Adding files and restarting Aider...`]);
-    });
-
     return () => {
       unlisten.then((fn) => fn());
       unlistenAiderLog.then((fn) => fn());
-      unlistenFileAdded.then((fn) => fn());
     };
   }, []);
 
