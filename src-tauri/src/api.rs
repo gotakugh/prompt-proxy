@@ -247,7 +247,7 @@ async fn chat_completions_handler(
      [Output Format Example]\n\
      (Write the target file path, and below it, use the format with <<<<<<< SEARCH, =======, and >>>>>>> REPLACE blocks)"
         } else {
-            "[IMPORTANT] Please output the answer to the user's question in natural text (code modification format is not required)."
+            "[IMPORTANT] Please output the answer to the user's question in natural text (code modification format is not required).\nONLY if you determine that necessary files are missing from context.xml to answer the question, output ONLY the format [ADD_FILE: file_path] without any other text."
         };
         format!(
             "Read the attached context.xml, understand the context, and answer/execute the following instructions.\n\n\

@@ -13,7 +13,7 @@ const DEFAULT_EDIT_PROMPT = "Read the attached context.xml, understand the conte
   "3. You must write the 'target file path' on a single line at the very beginning of the block so Aider can recognize it.\n" +
   "4. ONLY if you determine that necessary files are missing from context.xml, output ONLY the format [ADD_FILE: file_path] without any other text.";
 
-const DEFAULT_ASK_PROMPT = "Read the attached context.xml, understand the repository context, and answer the following question.\n\n=== Question ===\n{instruction}\n==============";
+const DEFAULT_ASK_PROMPT = "Read the attached context.xml, understand the repository context, and answer the following question.\n\n=== Question ===\n{instruction}\n==============\n\n[IMPORTANT]\nONLY if you determine that necessary files are missing from context.xml to answer the question, output ONLY the format [ADD_FILE: file_path] without any other text.";
 
 type AppState = "init" | "idle" | "pending";
 
