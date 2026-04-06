@@ -11,9 +11,9 @@ const DEFAULT_EDIT_PROMPT = "Read the attached context.xml, understand the conte
   "1. Omit all greetings and explanations.\n" +
   "2. Wrap the entire output in a markdown code block.\n" +
   "3. You must write the 'target file path' on a single line at the very beginning of the block so Aider can recognize it.\n" +
-  "4. ONLY if you determine that necessary files are missing from context.xml, DO NOT output the code block. Instead, tell the user to add the missing file paths to the 'Target Files' input on the UI and try again.";
+  "4. ONLY if you determine that necessary files are missing from context.xml, DO NOT output the code modification block. Instead, politely tell the user which files are missing, output the missing file paths in a single markdown code block (so the user can easily copy them), and ask the user to add them to the 'Target Files' input and try again.";
 
-const DEFAULT_ASK_PROMPT = "Read the attached context.xml, understand the repository context, and answer the following question.\n\n=== Question ===\n{instruction}\n==============\n\n[IMPORTANT]\nIf you determine that necessary files are missing from context.xml to answer the question, please tell the user which files are missing and ask them to add those files to the 'Target Files' input and run again.";
+const DEFAULT_ASK_PROMPT = "Read the attached context.xml, understand the repository context, and answer the following question.\n\n=== Question ===\n{instruction}\n==============\n\n[IMPORTANT]\nIf you determine that necessary files are missing from context.xml to answer the question, please tell the user which files are missing. Output the missing file paths in a single markdown code block (so the user can easily copy them), and ask the user to add them to the 'Target Files' input and run again.";
 
 type AppState = "init" | "idle" | "pending";
 
