@@ -100,10 +100,15 @@ pub fn spawn_aider_process(app_handle: &tauri::AppHandle, target_dir: String, fi
     let msg_file_path = temp_dir.join(format!("aider_msg_{}.txt", std::process::id()));
 
     let enc = file_encoding.trim();
-    if enc.eq_ignore_ascii_case("cp932") || enc.eq_ignore_ascii_case("shift_jis") {
-        // encoding_rsを使用してUTF-8からCP932(Shift_JIS)に変換。マッピングできない文字は安全に置換される。
-        let (cow, _, _) = encoding_rs::SHIFT_JIS.encode(&message);
-        let _ = std::fs::write(&msg_file_path, cow.as_ref());
+    if !enc.is_empty() {
+        // 入力された文字コード名（ラベル）から動的にエンコーディングを取得 (e.g., "cp932", "euc-jp", "windows-1252")
+        if let Some(encoding) = encoding_rs::Encoding::for_label(enc.as_bytes()) {
+            let (cow, _, _) = encoding.encode(&message);
+            let _ = std::fs::write(&msg_file_path, cow.as_ref());
+        } else {
+            // 未知のエンコーディング名の場合はUTF-8でフォールバック
+            let _ = std::fs::write(&msg_file_path, &message);
+        }
     } else {
         let _ = std::fs::write(&msg_file_path, &message);
     }
