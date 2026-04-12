@@ -3,7 +3,7 @@ use serde_json::{json, Value};
 use std::{fs, sync::Arc};
 use tauri::{AppHandle, Emitter, Manager};
 use time::OffsetDateTime;
-use tokio::sync::{oneshot, Mutex};
+use tokio::sync::Mutex;
 use tower_http::cors::{Any, CorsLayer};
 use uuid::Uuid;
 
@@ -62,7 +62,7 @@ async fn chat_completions_handler(
     // 1. Parse OpenAI JSON
     let messages = match payload.get("messages").and_then(|m| m.as_array()) {
         Some(m) => m,
-        None => return Json(json!({"error": "messages field is missing or not an array"})),
+        None => return Json(json!({"error": "messages field is missing or not an array"})).into_response(),
     };
 
     // --- NEW: UIで指定されたターゲットファイルとエンコーディングをStateから取得 ---
