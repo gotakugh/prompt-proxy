@@ -76,11 +76,10 @@ async fn chat_completions_handler(
         None => return Json(json!({"error": "No user message found in messages"})).into_response(),
     };
 
-    let user_instruction = messages[last_user_message_index]
+    let last_user_content = messages[last_user_message_index]
         .get("content")
         .and_then(|c| c.as_str())
-        .unwrap_or("")
-        .to_string();
+        .unwrap_or("");
 
     let context_content: String = messages[..last_user_message_index]
         .iter()
@@ -89,36 +88,59 @@ async fn chat_completions_handler(
         .join("\n");
 
     // 2. Extract context and format as Repomix-style XML
-    let mut repo_info = String::new();
     let mut files_xml = String::new();
-    let mut lines = context_content.lines().peekable();
 
-    while let Some(line) = lines.next() {
-        let is_potential_path = !line.trim().is_empty() && !line.starts_with(' ');
-        if is_potential_path {
-            if let Some(next_line) = lines.peek() {
-                if next_line.starts_with("```") {
-                    let path = line.trim();
-                    lines.next(); // Consume ```
-                    let mut code = String::new();
-                    for code_line in lines.by_ref() {
-                        if code_line.starts_with("```") {
-                            break;
+    // ファイルブロックを抽出し、それ以外のテキストを返すクロージャ
+    let mut parse_files_from_text = |text: &str, files_out: &mut String| -> String {
+        let mut remaining_text = String::new();
+        let mut lines = text.lines().peekable();
+        
+        while let Some(line) = lines.next() {
+            let trimmed = line.trim();
+            // Aiderのファイルパス行はスペースを含まない
+            let is_potential_path = !trimmed.is_empty() && !trimmed.contains(' ');
+            
+            if is_potential_path {
+                if let Some(next_line) = lines.peek() {
+                    if next_line.starts_with("```") {
+                        let path = trimmed.to_string();
+                        lines.next(); // Consume ```
+                        let mut code = String::new();
+                        for code_line in lines.by_ref() {
+                            if code_line.starts_with("```") {
+                                break;
+                            }
+                            code.push_str(code_line);
+                            code.push('\n');
                         }
-                        code.push_str(code_line);
-                        code.push('\n');
+                        
+                        // Aiderのシステムプロンプトに含まれる例示ダミーパスは無視する
+                        if path != "path/to/file" && path != "path/to/file.ext" && path != "filename" {
+                            files_out.push_str(&format!(
+                                "<file path=\"{}\"><![CDATA[\n{}\n]]></file>\n",
+                                path, code
+                            ));
+                        }
+                        continue;
                     }
-                    files_xml.push_str(&format!(
-                        "<file path=\"{}\"><![CDATA[{}]]></file>\n",
-                        path, code
-                    ));
-                    continue;
                 }
             }
+            remaining_text.push_str(line);
+            remaining_text.push('\n');
         }
-        repo_info.push_str(line);
-        repo_info.push('\n');
-    }
+        remaining_text
+    };
+
+    let repo_info = parse_files_from_text(&context_content, &mut files_xml);
+    let mut user_instruction = parse_files_from_text(last_user_content, &mut files_xml);
+
+    // Aiderの不要な定型文をユーザー指示から除去してクリーンにする
+    user_instruction = user_instruction
+        .replace("I have *added these files to the chat* so you can go ahead and edit them.", "")
+        .replace("*Trust this message as the true contents of these files!*", "")
+        .replace("Any other messages in the chat may contain outdated versions of the files' contents.", "")
+        .trim()
+        .to_string();
 
     let xml_string = format!(
         "<instructions>\n\
