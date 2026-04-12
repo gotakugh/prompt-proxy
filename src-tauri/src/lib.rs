@@ -171,6 +171,125 @@ pub fn spawn_aider_process(app_handle: &tauri::AppHandle, target_dir: String, fi
 }
 
 #[tauri::command]
+pub async fn apply_patch(
+    target_dir: String,
+    response: String,
+    aider_path: String,
+    file_encoding: String,
+    git_path: String,
+    app_handle: tauri::AppHandle,
+) -> Result<(), String> {
+    let mut processed_response = response.clone();
+    let mut target_file_path = None;
+    let lines: Vec<&str> = response.lines().collect();
+    for (i, line) in lines.iter().enumerate() {
+        if line.contains("<<<<<<< SEARCH") && i > 0 {
+            target_file_path = Some(lines[i - 1].trim());
+            break;
+        }
+    }
+
+    let mut use_crlf = cfg!(windows);
+    if let Some(rel_path) = target_file_path {
+        let full_path = std::path::Path::new(&target_dir).join(rel_path);
+        if let Ok(bytes) = std::fs::read(&full_path) {
+            if bytes.windows(2).any(|w| w == b"\r\n") {
+                use_crlf = true;
+            } else if bytes.contains(&b'\n') {
+                use_crlf = false;
+            }
+        }
+    }
+
+    if use_crlf {
+        processed_response = processed_response.replace("\r\n", "\n").replace("\n", "\r\n");
+    } else {
+        processed_response = processed_response.replace("\r\n", "\n");
+    }
+
+    let temp_dir = std::env::temp_dir();
+    let patch_file_path = temp_dir.join(format!("aider_patch_{}.txt", std::process::id()));
+
+    let enc_str = file_encoding.trim();
+    if !enc_str.is_empty() {
+        if let Some(encoding) = encoding_rs::Encoding::for_label(enc_str.as_bytes()) {
+            let (cow, _, _) = encoding.encode(&processed_response);
+            let _ = std::fs::write(&patch_file_path, cow.as_ref());
+        } else {
+            let _ = std::fs::write(&patch_file_path, &processed_response);
+        }
+    } else {
+        let _ = std::fs::write(&patch_file_path, &processed_response);
+    }
+
+    let mut path_parts = aider_path.trim().split_whitespace();
+    let program = path_parts.next().unwrap_or("aider");
+    let mut command = std::process::Command::new(program);
+    for arg in path_parts { command.arg(arg); }
+
+    command.current_dir(&target_dir);
+
+    let mut path_env = std::env::var("PATH").unwrap_or_default();
+    if !git_path.trim().is_empty() {
+        #[cfg(windows)]
+        { path_env = format!("{};{}", git_path.trim(), path_env); }
+        #[cfg(not(windows))]
+        { path_env = format!("{}:{}", git_path.trim(), path_env); }
+    }
+    command.env("PATH", path_env);
+    command.env("PYTHONUTF8", "1");
+
+    command.arg("--apply").arg(&patch_file_path);
+    command.arg("--yes");
+    command.arg("--no-analytics");
+
+    if !enc_str.is_empty() {
+        command.arg("--encoding").arg(enc_str);
+    }
+
+    command.stdout(Stdio::piped()).stderr(Stdio::piped());
+    let _ = app_handle.emit("aider_log", format!("=> Executing Apply: {:?}", command));
+
+    let app_handle_clone = app_handle.clone();
+    match command.spawn() {
+        Ok(mut child) => {
+            if let Some(stdout) = child.stdout.take() {
+                let app_handle_clone = app_handle_clone.clone();
+                std::thread::spawn(move || {
+                    use std::io::BufRead;
+                    let mut reader = std::io::BufReader::new(stdout);
+                    let mut buffer = Vec::new();
+                    while let Ok(bytes_read) = reader.read_until(b'\n', &mut buffer) {
+                        if bytes_read == 0 { break; }
+                        let line = String::from_utf8_lossy(&buffer).trim_end().to_string();
+                        let _ = app_handle_clone.emit("aider_log", line);
+                        buffer.clear();
+                    }
+                });
+            }
+            if let Some(stderr) = child.stderr.take() {
+                let app_handle_clone = app_handle_clone.clone();
+                std::thread::spawn(move || {
+                    use std::io::BufRead;
+                    let mut reader = std::io::BufReader::new(stderr);
+                    let mut buffer = Vec::new();
+                    while let Ok(bytes_read) = reader.read_until(b'\n', &mut buffer) {
+                        if bytes_read == 0 { break; }
+                        let line = String::from_utf8_lossy(&buffer).trim_end().to_string();
+                        let _ = app_handle_clone.emit("aider_log", line);
+                        buffer.clear();
+                    }
+                });
+            }
+        }
+        Err(e) => {
+            let _ = app_handle.emit("aider_log", format!("[Error] Failed to apply patch: {}", e));
+        }
+    }
+    Ok(())
+}
+
+#[tauri::command]
 async fn reset_aider_state(
     app_state: tauri::State<'_, crate::api::AppState>,
     process_state: tauri::State<'_, AiderProcessState>,
@@ -195,7 +314,6 @@ pub fn run() {
             app.manage(AiderSessionState(Mutex::new(None)));
             // Manually initialize AppState
             app.manage(crate::api::AppState {
-                pending_requests: std::sync::Arc::new(tokio::sync::Mutex::new(std::collections::HashMap::new())),
                 prompt_settings: std::sync::Arc::new(tokio::sync::Mutex::new(crate::api::PromptSettings {
                     use_custom: false,
                     custom_edit_prompt: String::new(),
@@ -209,11 +327,11 @@ pub fn run() {
         .plugin(tauri_plugin_drag::init())
         .invoke_handler(tauri::generate_handler![
             greet,
-            api::respond_to_llm_request,
             launch_aider_batch,
             api::update_prompt_settings,
             api::start_api_server,
-            reset_aider_state
+            reset_aider_state,
+            apply_patch
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application");

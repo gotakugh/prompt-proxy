@@ -50,7 +50,6 @@ struct Message {
 // This state will be managed by Tauri and accessible from both
 // the Axum handlers and Tauri commands.
 pub struct AppState {
-    pub pending_requests: Arc<Mutex<HashMap<String, ResponderTx>>>,
     pub prompt_settings: Arc<Mutex<PromptSettings>>,
     pub server_tx: Arc<Mutex<Option<tokio::sync::oneshot::Sender<()>>>>,
 }
@@ -61,15 +60,9 @@ async fn chat_completions_handler(
 ) -> impl IntoResponse {
     println!("=> [PromptProxy] Request received");
     let request_id = Uuid::new_v4().to_string();
-    let (tx, rx) = oneshot::channel::<String>();
 
     // Access the state managed by Tauri
     let state: tauri::State<AppState> = app_handle.state();
-    state
-        .pending_requests
-        .lock()
-        .await
-        .insert(request_id.clone(), tx);
 
     // 1. Parse OpenAI JSON and separate context from user instruction
     let messages = match payload.get("messages").and_then(|m| m.as_array()) {
@@ -278,90 +271,26 @@ async fn chat_completions_handler(
 
     app_handle.emit("prompt_received", &prompt_payload).unwrap();
 
-    println!("=> [PromptProxy] Event sent to frontend, waiting for response...");
+    println!("=> [PromptProxy] Event sent to frontend, returning dummy response to Aider...");
 
-    // Wait for the frontend to respond via the `respond_to_llm_request` command
-    match rx.await {
-        Ok(response_content) => {
-            println!("=> [PromptProxy] Response received from frontend");
-            let completion = OpenAIChatCompletion {
-                id: "chatcmpl-dummy".to_string(),
-                object: "chat.completion".to_string(),
-                created: OffsetDateTime::now_utc().unix_timestamp(),
-                model: "gpt-4o".to_string(),
-                choices: vec![Choice {
-                    index: 0,
-                    message: Message {
-                        role: "assistant".to_string(),
-                        content: response_content,
-                    },
-                    finish_reason: "stop".to_string(),
-                }],
-                usage: Usage {
-                    prompt_tokens: 0,
-                    completion_tokens: 0,
-                    total_tokens: 0,
-                },
-            };
-            println!("=> [PromptProxy] Returning response to Aider");
-            Json(completion).into_response()
-        }
-        Err(_) => {
-            println!(
-                "=> [PromptProxy] Error: oneshot channel was closed before receiving a response."
-            );
-            Json(json!({ "error": "Internal error: oneshot channel was closed" })).into_response()
-        }
-    }
+    let completion = OpenAIChatCompletion {
+        id: "chatcmpl-dummy".to_string(),
+        object: "chat.completion".to_string(),
+        created: OffsetDateTime::now_utc().unix_timestamp(),
+        model: "gpt-4o".to_string(),
+        choices: vec![Choice {
+            index: 0,
+            message: Message {
+                role: "assistant".to_string(),
+                content: "Understood. Context generated successfully.".to_string(),
+            },
+            finish_reason: "stop".to_string(),
+        }],
+        usage: Usage { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 },
+    };
+    Json(completion).into_response()
 }
 
-// This is the command that the frontend will call to provide the response.
-#[tauri::command]
-pub async fn respond_to_llm_request(
-    request_id: String,
-    response: String,
-    target_dir: String,
-    state: tauri::State<'_, AppState>,
-) -> Result<(), String> {
-    println!("=> [PromptProxy] Text received from React");
-
-    let mut processed_response = response.clone();
-    let mut target_file_path = None;
-    let lines: Vec<&str> = response.lines().collect();
-    for (i, line) in lines.iter().enumerate() {
-        if line.contains("<<<<<<< SEARCH") && i > 0 {
-            target_file_path = Some(lines[i - 1].trim());
-            break;
-        }
-    }
-
-    let mut use_crlf = cfg!(windows);
-    if let Some(rel_path) = target_file_path {
-        let full_path = std::path::Path::new(&target_dir).join(rel_path);
-        if let Ok(bytes) = std::fs::read(&full_path) {
-            if bytes.windows(2).any(|w| w == b"\r\n") {
-                use_crlf = true;
-            } else if bytes.contains(&b'\n') {
-                use_crlf = false;
-            }
-        }
-    }
-
-    if use_crlf {
-        processed_response = processed_response.replace("\r\n", "\n").replace("\n", "\r\n");
-        println!("=> [PromptProxy] Normalized newlines to CRLF");
-    } else {
-        processed_response = processed_response.replace("\r\n", "\n");
-        println!("=> [PromptProxy] Normalized newlines to LF");
-    }
-
-    if let Some(tx) = state.pending_requests.lock().await.remove(&request_id) {
-        tx.send(processed_response)
-            .map_err(|_| "Failed to send response".to_string())
-    } else {
-        Err("Request ID not found".to_string())
-    }
-}
 
 #[tauri::command]
 pub async fn update_prompt_settings(
@@ -380,7 +309,6 @@ pub async fn start_api_server(
     state: tauri::State<'_, AppState>,
     app_handle: tauri::AppHandle,
 ) -> Result<(), String> {
-    state.pending_requests.lock().await.clear();
     let mut server_tx = state.server_tx.lock().await;
     if let Some(tx) = server_tx.take() {
         let _ = tx.send(());

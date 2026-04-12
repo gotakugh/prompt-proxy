@@ -134,27 +134,20 @@ function App() {
     setAiResponse("");
   };
 
-  const sendResponseToAider = async (response: string) => {
+  const handleApplyPatch = async () => {
     if (promptData?.request_id) {
-      setLogs(prev => [...prev, `--- PromptProxy: Sending response to Aider [${new Date().toLocaleTimeString()}] ---`]);
-      await invoke("respond_to_llm_request", {
-        requestId: promptData.request_id,
-        response,
+      setLogs(prev => [...prev, `--- PromptProxy: Applying patch via Aider [${new Date().toLocaleTimeString()}] ---`]);
+      await invoke("apply_patch", {
         targetDir,
+        response: aiResponse,
+        aiderPath,
+        fileEncoding,
+        gitPath
       });
-
       setAppState("idle");
       setPromptData(null);
       setAiResponse("");
     }
-  };
-
-  const handleReturnToAider = () => {
-    sendResponseToAider(aiResponse);
-  };
-
-  const handleSkip = () => {
-    sendResponseToAider("Understood. No further changes needed.");
   };
 
   const handleSelectDirectory = async () => {
@@ -424,8 +417,7 @@ function App() {
                   disabled={appState !== "pending"}
                 />
                 <div className="button-group">
-                  <button onClick={handleReturnToAider} disabled={appState !== "pending"}>Return to Aider</button>
-                  <button onClick={handleSkip} disabled={appState !== "pending"}>Skip and return dummy response</button>
+                  <button onClick={handleApplyPatch} disabled={appState !== "pending"}>Apply Patch</button>
                 </div>
               </div>
             </div>
