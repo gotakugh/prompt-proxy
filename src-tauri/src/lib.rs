@@ -54,7 +54,7 @@ fn launch_aider_batch(
     spawn_aider_process(&app_handle, target_dir, files, message, chat_language, aider_path, file_encoding, api_port, git_path);
 }
 
-fn resolve_encoding_labels(input: &str) -> (String, String) {
+pub fn resolve_encoding_labels(input: &str) -> (String, String) {
     let normalized = input.trim().to_lowercase();
     match normalized.as_str() {
         "cp932" | "windows-31j" | "shift_jis" | "sjis" => {

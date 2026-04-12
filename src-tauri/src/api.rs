@@ -59,68 +59,43 @@ async fn chat_completions_handler(
     println!("=> [PromptProxy] Request received");
     let request_id = Uuid::new_v4().to_string();
 
-    // 1. Parse OpenAI JSON and separate context from user instruction
+    // 1. Parse OpenAI JSON
     let messages = match payload.get("messages").and_then(|m| m.as_array()) {
         Some(m) => m,
-        None => {
-            return Json(json!({"error": "messages field is missing or not an array"}))
-                .into_response()
+        None => return Json(json!({"error": "messages field is missing or not an array"})),
+    };
+
+    // --- NEW: UIで指定されたターゲットファイルとエンコーディングをStateから取得 ---
+    let session_state: tauri::State<crate::AiderSessionState> = app_handle.state();
+    let (target_dir, target_files, file_enc_str) = {
+        let lock = session_state.0.lock().unwrap();
+        if let Some(session) = &*lock {
+            (session.target_dir.clone(), session.files.clone(), session.file_encoding.clone())
+        } else {
+            ("".to_string(), "".to_string(), "".to_string())
         }
     };
 
-    let last_user_message_index = match messages
-        .iter()
-        .rposition(|m| m.get("role").and_then(|r| r.as_str()) == Some("user"))
-    {
-        Some(i) => i,
-        None => return Json(json!({"error": "No user message found in messages"})).into_response(),
-    };
-
-    let last_user_content = messages[last_user_message_index]
-        .get("content")
-        .and_then(|c| c.as_str())
-        .unwrap_or("");
-
-    let context_content: String = messages[..last_user_message_index]
-        .iter()
-        .filter_map(|msg| msg.get("content").and_then(|c| c.as_str()))
-        .collect::<Vec<_>>()
-        .join("\n");
-
-    // 2. Extract context and format as Repomix-style XML
-    let mut files_xml = String::new();
-
-    // インデックスベースの堅牢なステートマシンによるファイル抽出
-    let mut parse_files_from_text = |text: &str, files_out: &mut String| -> String {
+    // --- NEW: 重複防止のためのストリッパー関数 ---
+    // Aiderが万が一JSON内にファイルを含めてきた場合、二重出力を防ぐためターゲットファイルのみをJSONから削除する
+    let strip_target_files = |text: &str, target_files: &str| -> String {
         let mut remaining_text = String::new();
         let lines: Vec<&str> = text.lines().collect();
-        let mut i = 0;
+        let targets: Vec<&str> = target_files.split_whitespace().collect();
         
+        let mut i = 0;
         while i < lines.len() {
             let line = lines[i];
             let trimmed = line.trim();
             
-            // ファイルパスの可能性があるか（空行でなく、スペースを含まない）
-            let is_potential_path = !trimmed.is_empty() && !trimmed.contains(' ');
+            let is_target = targets.iter().any(|t| trimmed.ends_with(t));
             
-            if is_potential_path && i + 1 < lines.len() && lines[i+1].starts_with("```") {
-                let path = trimmed.to_string();
-                i += 2; // path と ```language をスキップ
-                
-                let mut code = String::new();
+            if is_target && i + 1 < lines.len() && lines[i+1].starts_with("```") {
+                i += 2;
                 while i < lines.len() && !lines[i].starts_with("```") {
-                    code.push_str(lines[i]);
-                    code.push('\n');
                     i += 1;
                 }
-                
-                // Aiderがシステムプロンプトに混ぜるダミーの例示パスは除外する
-                let path_lower = path.to_lowercase();
-                if !path_lower.contains("path/to/") && !path_lower.contains("filename") {
-                    files_out.push_str(&format!("<file path=\"{}\"><![CDATA[\n{}\n]]></file>\n", path, code));
-                }
-                
-                i += 1; // 閉じの ``` をスキップ
+                i += 1;
                 continue;
             }
             
@@ -131,10 +106,26 @@ async fn chat_completions_handler(
         remaining_text
     };
 
-    let repo_info = parse_files_from_text(&context_content, &mut files_xml);
-    let mut user_instruction = parse_files_from_text(last_user_content, &mut files_xml);
+    // 最後のUserメッセージのインデックスを取得
+    let last_user_idx = messages.iter().rposition(|m| m.get("role").and_then(|r| r.as_str()) == Some("user")).unwrap_or(0);
 
-    // Aiderが勝手に付与する不要な定型文を削除
+    let mut repo_info = String::new();
+    let mut user_instruction = String::new();
+
+    // メッセージの抽出（Systemプロンプトの素晴らしい例示ブロックは維持し、ファイルのみ除去）
+    for (i, msg) in messages.iter().enumerate() {
+        let content = msg.get("content").and_then(|c| c.as_str()).unwrap_or("");
+        let stripped_content = strip_target_files(content, &target_files);
+
+        if i == last_user_idx {
+            user_instruction = stripped_content;
+        } else {
+            repo_info.push_str(&stripped_content);
+            repo_info.push_str("\n\n");
+        }
+    }
+
+    // ユーザー指示から不要な定型文とタグをクリーニング
     user_instruction = user_instruction
         .replace("I have *added these files to the chat* so you can go ahead and edit them.", "")
         .replace("*Trust this message as the true contents of these files!*", "")
@@ -142,10 +133,48 @@ async fn chat_completions_handler(
         .trim()
         .to_string();
 
-    // 独自タグ [MODE:ASK] を検知してモードを判定し、ユーザーへの指示文からは削除する
     let expects_edit = !user_instruction.contains("[MODE:ASK]");
     user_instruction = user_instruction.replace("[MODE:ASK]", "").trim().to_string();
 
+    // --- NEW: ローカルディスクからの直接ファイル読み込み ＆ 魔法の言葉の付与 ---
+    let mut files_xml = String::new();
+    if !target_files.trim().is_empty() {
+        // LLMに「Aiderのチャットにファイルが追加された」と錯覚させる魔法の言葉を挿入
+        files_xml.push_str(
+            "I have *added these files to the chat* so you can go ahead and edit them.\n\
+             *Trust this message as the true contents of these files!*\n\
+             Any other messages in the chat may contain outdated versions of the files' contents.\n\n"
+        );
+
+        let dir_path = std::path::Path::new(&target_dir);
+        for file_name in target_files.split_whitespace() {
+            let file_path = dir_path.join(file_name);
+            if let Ok(bytes) = std::fs::read(&file_path) {
+                let mut decoded_content = String::new();
+                let enc_trim = file_enc_str.trim();
+                if !enc_trim.is_empty() {
+                    let (rust_enc, _) = crate::resolve_encoding_labels(enc_trim);
+                    if let Some(encoding) = encoding_rs::Encoding::for_label(rust_enc.as_bytes()) {
+                        let (cow, _, _) = encoding.decode(&bytes);
+                        decoded_content = cow.into_owned();
+                    } else {
+                        decoded_content = String::from_utf8_lossy(&bytes).into_owned();
+                    }
+                } else {
+                    decoded_content = String::from_utf8_lossy(&bytes).into_owned();
+                }
+
+                files_xml.push_str(&format!(
+                    "<file path=\"{}\"><![CDATA[\n{}\n]]></file>\n",
+                    file_name, decoded_content
+                ));
+            } else {
+                println!("=> [PromptProxy] Warning: Could not read target file: {:?}", file_path);
+            }
+        }
+    }
+
+    // 2. Format as XML
     let xml_string = format!(
         "<instructions>\n\
         This file contains the source code of the target project and the overall repository context in XML format.\n\
