@@ -1,6 +1,6 @@
 use axum::{extract::State, response::IntoResponse, routing::post, Json, Router};
 use serde_json::{json, Value};
-use std::{collections::HashMap, fs, sync::Arc};
+use std::{fs, sync::Arc};
 use tauri::{AppHandle, Emitter, Manager};
 use time::OffsetDateTime;
 use tokio::sync::{oneshot, Mutex};
@@ -60,9 +60,6 @@ async fn chat_completions_handler(
 ) -> impl IntoResponse {
     println!("=> [PromptProxy] Request received");
     let request_id = Uuid::new_v4().to_string();
-
-    // Access the state managed by Tauri
-    let state: tauri::State<AppState> = app_handle.state();
 
     // 1. Parse OpenAI JSON and separate context from user instruction
     let messages = match payload.get("messages").and_then(|m| m.as_array()) {

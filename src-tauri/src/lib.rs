@@ -1,5 +1,4 @@
 mod api;
-use std::io::{BufRead, BufReader};
 use std::process::{Child, Command, Stdio};
 use std::sync::Mutex;
 use std::thread;
@@ -171,7 +170,7 @@ pub fn spawn_aider_process(app_handle: &tauri::AppHandle, target_dir: String, fi
 }
 
 #[tauri::command]
-pub async fn apply_patch(
+async fn apply_patch(
     target_dir: String,
     response: String,
     aider_path: String,
@@ -295,7 +294,6 @@ async fn reset_aider_state(
     process_state: tauri::State<'_, AiderProcessState>,
 ) -> Result<(), String> {
     println!("=> [PromptProxy] Resetting system state and killing Aider processes...");
-    app_state.pending_requests.lock().await.clear();
     let mut processes = process_state.0.lock().unwrap();
     for mut child in processes.drain(..) {
         let _ = child.kill();
