@@ -107,7 +107,7 @@ pub fn spawn_aider_process(app_handle: &tauri::AppHandle, target_dir: String, fi
 
     let enc = file_encoding.trim();
     if !enc.is_empty() {
-        command.arg("--file-encoding").arg(enc);
+        command.arg("--encoding").arg(enc);
     }
 
     command.stdout(Stdio::piped()).stderr(Stdio::piped());
