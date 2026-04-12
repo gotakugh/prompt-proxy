@@ -54,6 +54,23 @@ fn launch_aider_batch(
     spawn_aider_process(&app_handle, target_dir, files, message, chat_language, aider_path, file_encoding, api_port, git_path);
 }
 
+fn resolve_encoding_labels(input: &str) -> (String, String) {
+    let normalized = input.trim().to_lowercase();
+    match normalized.as_str() {
+        "cp932" | "windows-31j" | "shift_jis" | "sjis" => {
+            // Rust(WHATWG)は windows-31j, Pythonは cp932 を好む
+            ("windows-31j".to_string(), "cp932".to_string())
+        },
+        "euc-jp" | "euc_jp" => {
+            ("euc-jp".to_string(), "euc_jp".to_string())
+        },
+        _ => {
+            // 未知のものや utf-8 はそのまま両方に渡す
+            (normalized.clone(), normalized)
+        }
+    }
+}
+
 pub fn spawn_aider_process(app_handle: &tauri::AppHandle, target_dir: String, files: String, message: String, chat_language: String, aider_path: String, file_encoding: String, api_port: u16, git_path: String) {
     let mut path_parts = aider_path.trim().split_whitespace();
     let program = path_parts.next().unwrap_or("aider");
@@ -98,14 +115,14 @@ pub fn spawn_aider_process(app_handle: &tauri::AppHandle, target_dir: String, fi
     let temp_dir = std::env::temp_dir();
     let msg_file_path = temp_dir.join(format!("aider_msg_{}.txt", std::process::id()));
 
-    let enc = file_encoding.trim();
-    if !enc.is_empty() {
-        // 入力された文字コード名（ラベル）から動的にエンコーディングを取得 (e.g., "cp932", "euc-jp", "windows-1252")
-        if let Some(encoding) = encoding_rs::Encoding::for_label(enc.as_bytes()) {
+    let enc_input = file_encoding.trim();
+    let (rust_enc, python_enc) = resolve_encoding_labels(enc_input);
+
+    if !rust_enc.is_empty() {
+        if let Some(encoding) = encoding_rs::Encoding::for_label(rust_enc.as_bytes()) {
             let (cow, _, _) = encoding.encode(&message);
             let _ = std::fs::write(&msg_file_path, cow.as_ref());
         } else {
-            // 未知のエンコーディング名の場合はUTF-8でフォールバック
             let _ = std::fs::write(&msg_file_path, &message);
         }
     } else {
@@ -117,9 +134,8 @@ pub fn spawn_aider_process(app_handle: &tauri::AppHandle, target_dir: String, fi
         command.arg("--chat-language").arg(chat_language.trim());
     }
 
-    let enc = file_encoding.trim();
-    if !enc.is_empty() {
-        command.arg("--encoding").arg(enc);
+    if !python_enc.is_empty() {
+        command.arg("--encoding").arg(python_enc);
     }
 
     command.stdout(Stdio::piped()).stderr(Stdio::piped());
@@ -209,9 +225,11 @@ async fn apply_patch(
     let temp_dir = std::env::temp_dir();
     let patch_file_path = temp_dir.join(format!("aider_patch_{}.txt", std::process::id()));
 
-    let enc_str = file_encoding.trim();
-    if !enc_str.is_empty() {
-        if let Some(encoding) = encoding_rs::Encoding::for_label(enc_str.as_bytes()) {
+    let enc_input = file_encoding.trim();
+    let (rust_enc, python_enc) = resolve_encoding_labels(enc_input);
+
+    if !rust_enc.is_empty() {
+        if let Some(encoding) = encoding_rs::Encoding::for_label(rust_enc.as_bytes()) {
             let (cow, _, _) = encoding.encode(&processed_response);
             let _ = std::fs::write(&patch_file_path, cow.as_ref());
         } else {
@@ -242,8 +260,8 @@ async fn apply_patch(
     command.arg("--yes");
     command.arg("--no-analytics");
 
-    if !enc_str.is_empty() {
-        command.arg("--encoding").arg(enc_str);
+    if !python_enc.is_empty() {
+        command.arg("--encoding").arg(python_enc);
     }
 
     command.stdout(Stdio::piped()).stderr(Stdio::piped());
