@@ -14,8 +14,6 @@ pub struct PromptSettings {
     pub custom_ask_prompt: String,
 }
 
-type ResponderTx = oneshot::Sender<String>;
-
 // OpenAI-compatible response structures
 #[derive(serde::Serialize)]
 struct OpenAIChatCompletion {

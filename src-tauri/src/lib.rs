@@ -290,7 +290,7 @@ async fn apply_patch(
 
 #[tauri::command]
 async fn reset_aider_state(
-    app_state: tauri::State<'_, crate::api::AppState>,
+    _app_state: tauri::State<'_, crate::api::AppState>,
     process_state: tauri::State<'_, AiderProcessState>,
 ) -> Result<(), String> {
     println!("=> [PromptProxy] Resetting system state and killing Aider processes...");
