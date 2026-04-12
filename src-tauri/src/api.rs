@@ -90,43 +90,43 @@ async fn chat_completions_handler(
     // 2. Extract context and format as Repomix-style XML
     let mut files_xml = String::new();
 
-    // ファイルブロックを抽出し、それ以外のテキストを返すクロージャ
+    // インデックスベースの堅牢なステートマシンによるファイル抽出
     let mut parse_files_from_text = |text: &str, files_out: &mut String| -> String {
         let mut remaining_text = String::new();
-        let mut lines = text.lines().peekable();
+        let lines: Vec<&str> = text.lines().collect();
+        let mut i = 0;
         
-        while let Some(line) = lines.next() {
+        while i < lines.len() {
+            let line = lines[i];
             let trimmed = line.trim();
-            // Aiderのファイルパス行はスペースを含まない
+            
+            // ファイルパスの可能性があるか（空行でなく、スペースを含まない）
             let is_potential_path = !trimmed.is_empty() && !trimmed.contains(' ');
             
-            if is_potential_path {
-                if let Some(next_line) = lines.peek() {
-                    if next_line.starts_with("```") {
-                        let path = trimmed.to_string();
-                        lines.next(); // Consume ```
-                        let mut code = String::new();
-                        for code_line in lines.by_ref() {
-                            if code_line.starts_with("```") {
-                                break;
-                            }
-                            code.push_str(code_line);
-                            code.push('\n');
-                        }
-                        
-                        // Aiderのシステムプロンプトに含まれる例示ダミーパスは無視する
-                        if path != "path/to/file" && path != "path/to/file.ext" && path != "filename" {
-                            files_out.push_str(&format!(
-                                "<file path=\"{}\"><![CDATA[\n{}\n]]></file>\n",
-                                path, code
-                            ));
-                        }
-                        continue;
-                    }
+            if is_potential_path && i + 1 < lines.len() && lines[i+1].starts_with("```") {
+                let path = trimmed.to_string();
+                i += 2; // path と ```language をスキップ
+                
+                let mut code = String::new();
+                while i < lines.len() && !lines[i].starts_with("```") {
+                    code.push_str(lines[i]);
+                    code.push('\n');
+                    i += 1;
                 }
+                
+                // Aiderがシステムプロンプトに混ぜるダミーの例示パスは除外する
+                let path_lower = path.to_lowercase();
+                if !path_lower.contains("path/to/") && !path_lower.contains("filename") {
+                    files_out.push_str(&format!("<file path=\"{}\"><![CDATA[\n{}\n]]></file>\n", path, code));
+                }
+                
+                i += 1; // 閉じの ``` をスキップ
+                continue;
             }
+            
             remaining_text.push_str(line);
             remaining_text.push('\n');
+            i += 1;
         }
         remaining_text
     };
@@ -134,13 +134,17 @@ async fn chat_completions_handler(
     let repo_info = parse_files_from_text(&context_content, &mut files_xml);
     let mut user_instruction = parse_files_from_text(last_user_content, &mut files_xml);
 
-    // Aiderの不要な定型文をユーザー指示から除去してクリーンにする
+    // Aiderが勝手に付与する不要な定型文を削除
     user_instruction = user_instruction
         .replace("I have *added these files to the chat* so you can go ahead and edit them.", "")
         .replace("*Trust this message as the true contents of these files!*", "")
         .replace("Any other messages in the chat may contain outdated versions of the files' contents.", "")
         .trim()
         .to_string();
+
+    // 独自タグ [MODE:ASK] を検知してモードを判定し、ユーザーへの指示文からは削除する
+    let expects_edit = !user_instruction.contains("[MODE:ASK]");
+    user_instruction = user_instruction.replace("[MODE:ASK]", "").trim().to_string();
 
     let xml_string = format!(
         "<instructions>\n\
@@ -149,8 +153,8 @@ async fn chat_completions_handler(
         - The file path tag contains the actual code of each file.\n\
         Please modify the code referring to this context according to the user instructions provided separately.\n\
          </instructions>\n\n\
-         <repository><![CDATA[{}]]></repository>\n{}",
-        repo_info, files_xml
+         <repository><![CDATA[\n{}\n]]></repository>\n{}",
+        repo_info.trim(), files_xml
     );
 
     let temp_dir = match app_handle.path().temp_dir() {
@@ -232,9 +236,6 @@ async fn chat_completions_handler(
     if json_file_path.starts_with("\\\\?\\") {
         json_file_path = json_file_path.replace("\\\\?\\", "");
     }
-
-    // AiderがSEARCH/REPLACEを要求しているか（Editモードか）を判定
-    let expects_edit = context_content.contains("SEARCH/REPLACE");
 
     let state: tauri::State<AppState> = app_handle.state();
     let settings = state.prompt_settings.lock().await;

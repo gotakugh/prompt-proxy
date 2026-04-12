@@ -161,7 +161,8 @@ function App() {
   };
 
   const handleLaunchAider = async () => {
-    const finalMessage = mode === "ask" ? `/ask ${instruction}` : instruction;
+    // Aiderをクラッシュさせる /ask の代わりに、Rustだけが解釈できる独自タグを付与
+    const finalMessage = mode === "ask" ? `[MODE:ASK]\n${instruction}` : instruction;
     await invoke("launch_aider_batch", {
       targetDir,
       files,
