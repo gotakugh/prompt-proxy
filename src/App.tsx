@@ -31,6 +31,7 @@ function App() {
   const [targetDir, setTargetDir] = useState("");
   const [files, setFiles] = useState("");
   const [instruction, setInstruction] = useState("");
+  const [fileEncoding, setFileEncoding] = useState(() => localStorage.getItem("fileEncoding") || "");
   const [chatLanguage, setChatLanguage] = useState(() => localStorage.getItem("chatLanguage") || "English");
   const [aiderPath, setAiderPath] = useState(() => localStorage.getItem("aiderPath") || "aider");
   const [apiPort, setApiPort] = useState(() => Number(localStorage.getItem("apiPort") || 8080));
@@ -93,6 +94,10 @@ function App() {
   useEffect(() => {
     localStorage.setItem("chatLanguage", chatLanguage);
   }, [chatLanguage]);
+
+  useEffect(() => {
+    localStorage.setItem("fileEncoding", fileEncoding);
+  }, [fileEncoding]);
 
   useEffect(() => {
     const unlisten = listen<PromptPayload>("prompt_received", (event) => {
@@ -167,6 +172,7 @@ function App() {
       message: finalMessage,
       chatLanguage,
       aiderPath,
+      fileEncoding,
       apiPort: Number(apiPort),
     });
     setAppState("idle");
@@ -307,6 +313,15 @@ function App() {
                   />
                   <button onClick={handleSelectDirectory}>Select Folder</button>
                 </div>
+              </div>
+              <div className="form-group">
+                <label>File Encoding (e.g. cp932. Leave blank for default)</label>
+                <input
+                  type="text"
+                  value={fileEncoding}
+                  onChange={(e) => setFileEncoding(e.target.value)}
+                  placeholder="Leave blank for default"
+                />
               </div>
               <div className="form-group">
                 <label>Target Files (Space-separated for multiple. Can be blank)</label>

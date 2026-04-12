@@ -14,6 +14,7 @@ pub struct AiderSession {
     pub message: String,
     pub chat_language: String,
     pub aider_path: String,
+    pub file_encoding: String,
     pub api_port: u16,
 }
 pub struct AiderSessionState(pub Mutex<Option<AiderSession>>);
@@ -31,6 +32,7 @@ fn launch_aider_batch(
     message: String,
     chat_language: String,
     aider_path: String,
+    file_encoding: String,
     api_port: u16,
     app_handle: tauri::AppHandle,
     session_state: tauri::State<'_, AiderSessionState>,
@@ -42,14 +44,15 @@ fn launch_aider_batch(
         message: message.clone(),
         chat_language: chat_language.clone(),
         aider_path: aider_path.clone(),
+        file_encoding: file_encoding.clone(),
         api_port,
     };
     *session_state.0.lock().unwrap() = Some(session);
 
-    spawn_aider_process(&app_handle, target_dir, files, message, chat_language, aider_path, api_port);
+    spawn_aider_process(&app_handle, target_dir, files, message, chat_language, aider_path, file_encoding, api_port);
 }
 
-pub fn spawn_aider_process(app_handle: &tauri::AppHandle, target_dir: String, files: String, message: String, chat_language: String, aider_path: String, api_port: u16) {
+pub fn spawn_aider_process(app_handle: &tauri::AppHandle, target_dir: String, files: String, message: String, chat_language: String, aider_path: String, file_encoding: String, api_port: u16) {
     let mut command = Command::new(&aider_path);
     command.current_dir(&target_dir);
 
@@ -75,6 +78,11 @@ pub fn spawn_aider_process(app_handle: &tauri::AppHandle, target_dir: String, fi
 
     if !chat_language.trim().is_empty() {
         command.arg("--chat-language").arg(chat_language.trim());
+    }
+
+    let enc = file_encoding.trim();
+    if !enc.is_empty() {
+        command.arg("--file-encoding").arg(enc);
     }
 
     command.stdout(Stdio::piped()).stderr(Stdio::piped());
