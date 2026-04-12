@@ -15,6 +15,7 @@ pub struct AiderSession {
     pub chat_language: String,
     pub aider_path: String,
     pub file_encoding: String,
+    pub git_path: String,
     pub api_port: u16,
 }
 pub struct AiderSessionState(pub Mutex<Option<AiderSession>>);
@@ -33,6 +34,7 @@ fn launch_aider_batch(
     chat_language: String,
     aider_path: String,
     file_encoding: String,
+    git_path: String,
     api_port: u16,
     app_handle: tauri::AppHandle,
     session_state: tauri::State<'_, AiderSessionState>,
@@ -45,16 +47,35 @@ fn launch_aider_batch(
         chat_language: chat_language.clone(),
         aider_path: aider_path.clone(),
         file_encoding: file_encoding.clone(),
+        git_path: git_path.clone(),
         api_port,
     };
     *session_state.0.lock().unwrap() = Some(session);
 
-    spawn_aider_process(&app_handle, target_dir, files, message, chat_language, aider_path, file_encoding, api_port);
+    spawn_aider_process(&app_handle, target_dir, files, message, chat_language, aider_path, file_encoding, api_port, git_path);
 }
 
-pub fn spawn_aider_process(app_handle: &tauri::AppHandle, target_dir: String, files: String, message: String, chat_language: String, aider_path: String, file_encoding: String, api_port: u16) {
-    let mut command = Command::new(&aider_path);
+pub fn spawn_aider_process(app_handle: &tauri::AppHandle, target_dir: String, files: String, message: String, chat_language: String, aider_path: String, file_encoding: String, api_port: u16, git_path: String) {
+    let mut path_parts = aider_path.trim().split_whitespace();
+    let program = path_parts.next().unwrap_or("aider");
+    let mut command = Command::new(program);
+    for arg in path_parts {
+        command.arg(arg);
+    }
+    
     command.current_dir(&target_dir);
+
+    let mut path_env = std::env::var("PATH").unwrap_or_default();
+    if !git_path.trim().is_empty() {
+        #[cfg(windows)]
+        { path_env = format!("{};{}", git_path.trim(), path_env); }
+        #[cfg(not(windows))]
+        { path_env = format!("{}:{}", git_path.trim(), path_env); }
+    }
+    command.env("PATH", path_env);
+    
+    command.env("PYTHONUTF8", "1");
+    command.env("AIDER_CHECK_UPDATE", "false");
 
     if !files.trim().is_empty() {
         for file in files.split_whitespace() {
@@ -64,7 +85,7 @@ pub fn spawn_aider_process(app_handle: &tauri::AppHandle, target_dir: String, fi
 
     command.args([
         "--openai-api-base",
-        &format!("http://localhost:{}/v1", api_port),
+        &format!("http://127.0.0.1:{}/v1", api_port),
         "--openai-api-key",
         "dummy",
         "--model",
@@ -72,9 +93,13 @@ pub fn spawn_aider_process(app_handle: &tauri::AppHandle, target_dir: String, fi
         "--no-stream",
         "--no-auto-commits",
         "--yes",
+        "--no-analytics",
     ]);
 
-    command.arg("--message").arg(message);
+    let temp_dir = std::env::temp_dir();
+    let msg_file_path = temp_dir.join(format!("aider_msg_{}.txt", std::process::id()));
+    let _ = std::fs::write(&msg_file_path, &message);
+    command.arg("--message-file").arg(&msg_file_path);
 
     if !chat_language.trim().is_empty() {
         command.arg("--chat-language").arg(chat_language.trim());
@@ -87,6 +112,8 @@ pub fn spawn_aider_process(app_handle: &tauri::AppHandle, target_dir: String, fi
 
     command.stdout(Stdio::piped()).stderr(Stdio::piped());
 
+    let _ = app_handle.emit("aider_log", format!("=> Executing: {:?}", command));
+
     let state = app_handle.state::<AiderProcessState>();
     let app_handle_clone = app_handle.clone();
 
@@ -95,30 +122,37 @@ pub fn spawn_aider_process(app_handle: &tauri::AppHandle, target_dir: String, fi
             if let Some(stdout) = child.stdout.take() {
                 let app_handle_clone = app_handle_clone.clone();
                 std::thread::spawn(move || {
-                    let reader = BufReader::new(stdout);
-                    for line in reader.lines() {
-                        if let Ok(line) = line {
-                            let _ = app_handle_clone.emit("aider_log", line);
-                        }
+                    use std::io::BufRead;
+                    let mut reader = std::io::BufReader::new(stdout);
+                    let mut buffer = Vec::new();
+                    while let Ok(bytes_read) = reader.read_until(b'\n', &mut buffer) {
+                        if bytes_read == 0 { break; }
+                        let line = String::from_utf8_lossy(&buffer).trim_end().to_string();
+                        let _ = app_handle_clone.emit("aider_log", line);
+                        buffer.clear();
                     }
                 });
             }
             if let Some(stderr) = child.stderr.take() {
                 let app_handle_clone = app_handle_clone.clone();
                 std::thread::spawn(move || {
-                    let reader = BufReader::new(stderr);
-                    for line in reader.lines() {
-                        if let Ok(line) = line {
-                            let _ = app_handle_clone.emit("aider_log", line);
-                        }
+                    use std::io::BufRead;
+                    let mut reader = std::io::BufReader::new(stderr);
+                    let mut buffer = Vec::new();
+                    while let Ok(bytes_read) = reader.read_until(b'\n', &mut buffer) {
+                        if bytes_read == 0 { break; }
+                        let line = String::from_utf8_lossy(&buffer).trim_end().to_string();
+                        let _ = app_handle_clone.emit("aider_log", line);
+                        buffer.clear();
                     }
                 });
             }
-
             state.0.lock().unwrap().push(child);
         }
         Err(e) => {
-            eprintln!("Failed to spawn aider in '{}': {}", target_dir, e);
+            let err_msg = format!("[Error] Failed to spawn aider in '{}': {}", target_dir, e);
+            eprintln!("{}", err_msg);
+            let _ = app_handle.emit("aider_log", err_msg);
         }
     }
 }

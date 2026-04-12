@@ -320,11 +320,43 @@ async fn chat_completions_handler(
 pub async fn respond_to_llm_request(
     request_id: String,
     response: String,
+    target_dir: String,
     state: tauri::State<'_, AppState>,
 ) -> Result<(), String> {
-    println!("=> [PromptProxy] Text received from React: {}", response);
+    println!("=> [PromptProxy] Text received from React");
+
+    let mut processed_response = response.clone();
+    let mut target_file_path = None;
+    let lines: Vec<&str> = response.lines().collect();
+    for (i, line) in lines.iter().enumerate() {
+        if line.contains("<<<<<<< SEARCH") && i > 0 {
+            target_file_path = Some(lines[i - 1].trim());
+            break;
+        }
+    }
+
+    let mut use_crlf = cfg!(windows);
+    if let Some(rel_path) = target_file_path {
+        let full_path = std::path::Path::new(&target_dir).join(rel_path);
+        if let Ok(bytes) = std::fs::read(&full_path) {
+            if bytes.windows(2).any(|w| w == b"\r\n") {
+                use_crlf = true;
+            } else if bytes.contains(&b'\n') {
+                use_crlf = false;
+            }
+        }
+    }
+
+    if use_crlf {
+        processed_response = processed_response.replace("\r\n", "\n").replace("\n", "\r\n");
+        println!("=> [PromptProxy] Normalized newlines to CRLF");
+    } else {
+        processed_response = processed_response.replace("\r\n", "\n");
+        println!("=> [PromptProxy] Normalized newlines to LF");
+    }
+
     if let Some(tx) = state.pending_requests.lock().await.remove(&request_id) {
-        tx.send(response)
+        tx.send(processed_response)
             .map_err(|_| "Failed to send response".to_string())
     } else {
         Err("Request ID not found".to_string())

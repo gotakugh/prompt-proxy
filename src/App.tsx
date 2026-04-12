@@ -32,6 +32,7 @@ function App() {
   const [files, setFiles] = useState("");
   const [instruction, setInstruction] = useState("");
   const [fileEncoding, setFileEncoding] = useState(() => localStorage.getItem("fileEncoding") || "");
+  const [gitPath, setGitPath] = useState(() => localStorage.getItem("gitPath") || "");
   const [chatLanguage, setChatLanguage] = useState(() => localStorage.getItem("chatLanguage") || "English");
   const [aiderPath, setAiderPath] = useState(() => localStorage.getItem("aiderPath") || "aider");
   const [apiPort, setApiPort] = useState(() => Number(localStorage.getItem("apiPort") || 8080));
@@ -75,6 +76,7 @@ function App() {
     const settingsToSave = { useCustomPrompt, customEditPrompt, customAskPrompt };
     localStorage.setItem("promptSettings", JSON.stringify(settingsToSave));
     localStorage.setItem("aiderPath", aiderPath);
+    localStorage.setItem("gitPath", gitPath);
     localStorage.setItem("apiPort", String(apiPort));
 
     const settingsForRust = {
@@ -85,7 +87,7 @@ function App() {
     invoke("update_prompt_settings", { settings: settingsForRust }).catch(
       console.error
     );
-  }, [useCustomPrompt, customEditPrompt, customAskPrompt, aiderPath, apiPort]);
+  }, [useCustomPrompt, customEditPrompt, customAskPrompt, aiderPath, apiPort, gitPath]);
 
   useEffect(() => {
     invoke("start_api_server", { port: Number(apiPort) }).catch(console.error);
@@ -138,6 +140,7 @@ function App() {
       await invoke("respond_to_llm_request", {
         requestId: promptData.request_id,
         response,
+        targetDir,
       });
 
       setAppState("idle");
@@ -173,6 +176,7 @@ function App() {
       chatLanguage,
       aiderPath,
       fileEncoding,
+      gitPath,
       apiPort: Number(apiPort),
     });
     setAppState("idle");
@@ -238,6 +242,10 @@ function App() {
                 value={apiPort}
                 onChange={(e) => setApiPort(Number(e.target.value))}
               />
+            </div>
+            <div className="form-group">
+              <label>Git Path (Optional. e.g. C:\Program Files\Git\cmd)</label>
+              <input type="text" value={gitPath} onChange={(e) => setGitPath(e.target.value)} placeholder="Leave blank if git is in PATH" />
             </div>
             <div className="form-group">
               <label>Chat Language (Aider's thinking/response language)</label>
