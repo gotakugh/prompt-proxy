@@ -76,51 +76,20 @@ async fn chat_completions_handler(
         }
     };
 
-    // --- NEW: 重複防止のためのストリッパー関数 ---
-    // Aiderが万が一JSON内にファイルを含めてきた場合、二重出力を防ぐためターゲットファイルのみをJSONから削除する
-    let strip_target_files = |text: &str, target_files: &str| -> String {
-        let mut remaining_text = String::new();
-        let lines: Vec<&str> = text.lines().collect();
-        let targets: Vec<&str> = target_files.split_whitespace().collect();
-        
-        let mut i = 0;
-        while i < lines.len() {
-            let line = lines[i];
-            let trimmed = line.trim();
-            
-            let is_target = targets.iter().any(|t| trimmed.ends_with(t));
-            
-            if is_target && i + 1 < lines.len() && lines[i+1].starts_with("```") {
-                i += 2;
-                while i < lines.len() && !lines[i].starts_with("```") {
-                    i += 1;
-                }
-                i += 1;
-                continue;
-            }
-            
-            remaining_text.push_str(line);
-            remaining_text.push('\n');
-            i += 1;
-        }
-        remaining_text
-    };
-
     // 最後のUserメッセージのインデックスを取得
     let last_user_idx = messages.iter().rposition(|m| m.get("role").and_then(|r| r.as_str()) == Some("user")).unwrap_or(0);
 
     let mut repo_info = String::new();
     let mut user_instruction = String::new();
 
-    // メッセージの抽出（Systemプロンプトの素晴らしい例示ブロックは維持し、ファイルのみ除去）
+    // メッセージの抽出（Aiderにファイルを渡していないため、純粋なルールとRepo Mapのみが届く）
     for (i, msg) in messages.iter().enumerate() {
         let content = msg.get("content").and_then(|c| c.as_str()).unwrap_or("");
-        let stripped_content = strip_target_files(content, &target_files);
 
         if i == last_user_idx {
-            user_instruction = stripped_content;
+            user_instruction = content.to_string();
         } else {
-            repo_info.push_str(&stripped_content);
+            repo_info.push_str(content);
             repo_info.push_str("\n\n");
         }
     }
@@ -149,27 +118,33 @@ async fn chat_completions_handler(
         let dir_path = std::path::Path::new(&target_dir);
         for file_name in target_files.split_whitespace() {
             let file_path = dir_path.join(file_name);
-            if let Ok(bytes) = std::fs::read(&file_path) {
-                let mut decoded_content = String::new();
-                let enc_trim = file_enc_str.trim();
-                if !enc_trim.is_empty() {
-                    let (rust_enc, _) = crate::resolve_encoding_labels(enc_trim);
-                    if let Some(encoding) = encoding_rs::Encoding::for_label(rust_enc.as_bytes()) {
-                        let (cow, _, _) = encoding.decode(&bytes);
-                        decoded_content = cow.into_owned();
+            match std::fs::read(&file_path) {
+                Ok(bytes) => {
+                    let mut decoded_content = String::new();
+                    let enc_trim = file_enc_str.trim();
+                    if !enc_trim.is_empty() {
+                        let (rust_enc, _) = crate::resolve_encoding_labels(enc_trim);
+                        if let Some(encoding) = encoding_rs::Encoding::for_label(rust_enc.as_bytes()) {
+                            let (cow, _, _) = encoding.decode(&bytes);
+                            decoded_content = cow.into_owned();
+                        } else {
+                            decoded_content = String::from_utf8_lossy(&bytes).into_owned();
+                        }
                     } else {
                         decoded_content = String::from_utf8_lossy(&bytes).into_owned();
                     }
-                } else {
-                    decoded_content = String::from_utf8_lossy(&bytes).into_owned();
-                }
 
-                files_xml.push_str(&format!(
-                    "<file path=\"{}\"><![CDATA[\n{}\n]]></file>\n",
-                    file_name, decoded_content
-                ));
-            } else {
-                println!("=> [PromptProxy] Warning: Could not read target file: {:?}", file_path);
+                    files_xml.push_str(&format!(
+                        "<file path=\"{}\"><![CDATA[\n{}\n]]></file>\n",
+                        file_name, decoded_content
+                    ));
+                }
+                Err(e) => {
+                    // ファイルが読めなかった場合、UIの黒いターミナル領域にエラーを表示して知らせる
+                    let err_msg = format!("=> [PromptProxy] Error: Could not read target file: {:?} - {}", file_path, e);
+                    println!("{}", err_msg);
+                    let _ = app_handle.emit("aider_log", err_msg);
+                }
             }
         }
     }

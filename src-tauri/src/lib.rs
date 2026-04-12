@@ -93,12 +93,6 @@ pub fn spawn_aider_process(app_handle: &tauri::AppHandle, target_dir: String, fi
     command.env("PYTHONUTF8", "1");
     command.env("AIDER_CHECK_UPDATE", "false");
 
-    if !files.trim().is_empty() {
-        for file in files.split_whitespace() {
-            command.arg(file);
-        }
-    }
-
     command.args([
         "--openai-api-base",
         &format!("http://127.0.0.1:{}/v1", api_port),
