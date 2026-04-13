@@ -192,6 +192,13 @@ function App() {
     } else {
       // Windows/Mac: Use Tauri native plugin
       e.preventDefault();
+      
+      // TS2322エラー回避: iconPath が undefined の場合は処理を中断する
+      if (!iconPath) {
+        console.error("Drag failed: iconPath is missing.");
+        return;
+      }
+
       try {
         await startDrag({
           item: [filePath],
