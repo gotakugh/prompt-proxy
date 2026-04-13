@@ -105,68 +105,14 @@ async fn chat_completions_handler(
     let expects_edit = !user_instruction.contains("[MODE:ASK]");
     user_instruction = user_instruction.replace("[MODE:ASK]", "").trim().to_string();
 
-    // --- NEW: ローカルディスクからの直接ファイル読み込み ＆ 魔法の言葉の付与 ---
-    let mut files_xml = String::new();
-    if !target_files.trim().is_empty() {
-        // LLMに「Aiderのチャットにファイルが追加された」と錯覚させる魔法の言葉を挿入
-        files_xml.push_str(
-            "I have *added these files to the chat* so you can go ahead and edit them.\n\
-             *Trust this message as the true contents of these files!*\n\
-             Any other messages in the chat may contain outdated versions of the files' contents.\n\n"
-        );
-
-        let dir_path = std::path::Path::new(&target_dir);
-        for file_name in target_files.split_whitespace() {
-            let file_path = dir_path.join(file_name);
-            // 実際にOSが参照する絶対パスを取得（失敗時は元のパスを使用）
-            let abs_path = std::fs::canonicalize(&file_path).unwrap_or_else(|_| file_path.clone());
-
-            match std::fs::read(&file_path) {
-                Ok(bytes) => {
-                    // 成功ログ：ファイルの絶対パスとバイト数をUIに出力
-                    let success_msg = format!("=> [PromptProxy] Read file: {} ({} bytes)", abs_path.display(), bytes.len());
-                    println!("{}", success_msg);
-                    let _ = app_handle.emit("aider_log", success_msg);
-
-                    let mut decoded_content = String::new();
-                    let enc_trim = file_enc_str.trim();
-                    if !enc_trim.is_empty() {
-                        let (rust_enc, _) = crate::resolve_encoding_labels(enc_trim);
-                        if let Some(encoding) = encoding_rs::Encoding::for_label(rust_enc.as_bytes()) {
-                            let (cow, _, _) = encoding.decode(&bytes);
-                            decoded_content = cow.into_owned();
-                        } else {
-                            decoded_content = String::from_utf8_lossy(&bytes).into_owned();
-                        }
-                    } else {
-                        decoded_content = String::from_utf8_lossy(&bytes).into_owned();
-                    }
-
-                    files_xml.push_str(&format!(
-                        "<file path=\"{}\"><![CDATA[\n{}\n]]></file>\n",
-                        file_name, decoded_content
-                    ));
-                }
-                Err(e) => {
-                    // エラーログ：オープン/リード失敗時のパスとOSのエラー理由（NotFound等）をUIに出力
-                    let err_msg = format!("=> [PromptProxy] Error: Failed to open/read file: {} - {}", abs_path.display(), e);
-                    println!("{}", err_msg);
-                    let _ = app_handle.emit("aider_log", err_msg);
-                }
-            }
-        }
-    }
-
     // 2. Format as XML
     let xml_string = format!(
         "<instructions>\n\
-        This file contains the source code of the target project and the overall repository context in XML format.\n\
-        - The repository tag contains repository structure and important rules.\n\
-        - The file path tag contains the actual code of each file.\n\
-        Please modify the code referring to this context according to the user instructions provided separately.\n\
+        This file contains the overall repository context and important rules in XML format.\n\
+        Please refer to this context to understand the project structure.\n\
          </instructions>\n\n\
-         <repository><![CDATA[\n{}\n]]></repository>\n{}",
-        repo_info.trim(), files_xml
+         <repository><![CDATA[\n{}\n]]></repository>",
+        repo_info.trim()
     );
 
     let temp_dir = match app_handle.path().temp_dir() {
@@ -183,10 +129,10 @@ async fn chat_completions_handler(
             .into_response();
     }
 
-    let temp_path = temp_dir.join("context.xml");
+    let temp_path = temp_dir.join("repo_map.xml");
 
-    if let Err(e) = fs::write(&temp_path, xml_string) {
-        return Json(json!({ "error": format!("Failed to write context.xml: {}", e)}))
+    if let Err(e) = fs::write(&temp_path, &xml_string) {
+        return Json(json!({ "error": format!("Failed to write repo_map.xml: {}", e)}))
             .into_response();
     }
 
@@ -206,13 +152,13 @@ async fn chat_completions_handler(
         }
     };
 
-    let mut context_file_path = match absolute_path.to_str() {
+    let mut repo_map_file_path = match absolute_path.to_str() {
         Some(s) => s.to_string(),
         None => return Json(json!({"error": "Temp path contains invalid UTF-8"})).into_response(),
     };
     // Remove the UNC path prefix on Windows to ensure the OS drag API works correctly.
-    if context_file_path.starts_with("\\\\?\\") {
-        context_file_path = context_file_path.replace("\\\\?\\", "");
+    if repo_map_file_path.starts_with("\\\\?\\") {
+        repo_map_file_path = repo_map_file_path.replace("\\\\?\\", "");
     }
 
     let absolute_icon_path = match std::fs::canonicalize(&icon_path) {
@@ -232,22 +178,6 @@ async fn chat_completions_handler(
         icon_file_path = icon_file_path.replace("\\\\?\\", "");
     }
 
-    let absolute_json_path = match std::fs::canonicalize(&json_path) {
-        Ok(path) => path,
-        Err(e) => {
-            return Json(
-                json!({ "error": format!("Failed to get absolute path for aider_payload.json: {}", e)}),
-            )
-            .into_response()
-        }
-    };
-    let mut json_file_path = match absolute_json_path.to_str() {
-        Some(s) => s.to_string(),
-        None => return Json(json!({"error": "JSON path contains invalid UTF-8"})).into_response(),
-    };
-    if json_file_path.starts_with("\\\\?\\") {
-        json_file_path = json_file_path.replace("\\\\?\\", "");
-    }
 
     let state: tauri::State<AppState> = app_handle.state();
     let settings = state.prompt_settings.lock().await;
@@ -284,22 +214,18 @@ async fn chat_completions_handler(
 
     // 4. Emit data to frontend
     #[derive(Clone, serde::Serialize)]
-    struct PromptPayload<'a> {
-        request_id: &'a str,
-        context_file_path: &'a str,
+    struct RepoMapPayload<'a> {
+        repo_map_file_path: &'a str,
         icon_file_path: &'a str,
-        json_file_path: &'a str,
         prompt: &'a str,
     }
-    let prompt_payload = PromptPayload {
-        request_id: &request_id,
-        context_file_path: &context_file_path,
+    let repo_map_payload = RepoMapPayload {
+        repo_map_file_path: &repo_map_file_path,
         icon_file_path: &icon_file_path,
-        json_file_path: &json_file_path,
         prompt: &final_prompt,
     };
 
-    app_handle.emit("prompt_received", &prompt_payload).unwrap();
+    app_handle.emit("repo_map_ready", &repo_map_payload).unwrap();
 
     println!("=> [PromptProxy] Event sent to frontend, returning dummy response to Aider...");
 
@@ -319,6 +245,59 @@ async fn chat_completions_handler(
         usage: Usage { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 },
     };
     Json(completion).into_response()
+}
+
+#[tauri::command]
+pub async fn pack_target_files(
+    target_dir: String,
+    files: String,
+    file_encoding: String,
+    app_handle: tauri::AppHandle,
+) -> Result<String, String> {
+    let mut files_xml = String::new();
+    // 魔法の言葉を挿入
+    files_xml.push_str(
+        "I have *added these files to the chat* so you can go ahead and edit them.\n\
+         *Trust this message as the true contents of these files!*\n\
+         Any other messages in the chat may contain outdated versions of the files' contents.\n\n"
+    );
+
+    let dir_path = std::path::Path::new(&target_dir);
+    for file_name in files.split_whitespace() {
+        let file_path = dir_path.join(file_name);
+        let abs_path = std::fs::canonicalize(&file_path).unwrap_or_else(|_| file_path.clone());
+        match std::fs::read(&file_path) {
+            Ok(bytes) => {
+                let _ = app_handle.emit("aider_log", format!("=> [PromptProxy] Read file: {} ({} bytes)", abs_path.display(), bytes.len()));
+                let mut decoded_content = String::new();
+                let enc_trim = file_encoding.trim();
+                if !enc_trim.is_empty() {
+                    let (rust_enc, _) = crate::resolve_encoding_labels(enc_trim);
+                    if let Some(encoding) = encoding_rs::Encoding::for_label(rust_enc.as_bytes()) {
+                        let (cow, _, _) = encoding.decode(&bytes);
+                        decoded_content = cow.into_owned();
+                    } else {
+                        decoded_content = String::from_utf8_lossy(&bytes).into_owned();
+                    }
+                } else {
+                    decoded_content = String::from_utf8_lossy(&bytes).into_owned();
+                }
+                files_xml.push_str(&format!("<file path=\"{}\"><![CDATA[\n{}\n]]></file>\n", file_name, decoded_content));
+            }
+            Err(e) => {
+                let _ = app_handle.emit("aider_log", format!("=> [PromptProxy] Error: Failed to read {}: {}", abs_path.display(), e));
+            }
+        }
+    }
+
+    let temp_dir = std::env::temp_dir();
+    let temp_path = temp_dir.join("target_files.xml");
+    std::fs::write(&temp_path, files_xml).map_err(|e| e.to_string())?;
+    
+    let abs_out = std::fs::canonicalize(&temp_path).unwrap_or(temp_path);
+    let mut out_str = abs_out.to_string_lossy().to_string();
+    if out_str.starts_with("\\\\?\\") { out_str = out_str.replace("\\\\?\\", ""); }
+    Ok(out_str)
 }
 
 

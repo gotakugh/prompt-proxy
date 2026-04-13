@@ -15,18 +15,13 @@ const DEFAULT_EDIT_PROMPT = "Read the attached context.xml, understand the conte
 
 const DEFAULT_ASK_PROMPT = "Read the attached context.xml, understand the repository context, and answer the following question.\n\n=== Question ===\n{instruction}\n==============\n\n[IMPORTANT]\nIf you determine that necessary files are missing from context.xml to answer the question, please tell the user which files are missing. Output the missing file paths in a single markdown code block (so the user can easily copy them), and ask the user to add them to the 'Target Files' input and run again.";
 
-type AppState = "init" | "idle" | "pending";
-
-interface PromptPayload {
-  request_id: string;
-  context_file_path: string;
+interface RepoMapPayload {
+  repo_map_file_path: string;
   icon_file_path: string;
-  json_file_path: string;
   prompt: string;
 }
 
 function App() {
-  const [appState, setAppState] = useState<AppState>("init");
   const [mode, setMode] = useState<"edit" | "ask">("edit");
   const [targetDir, setTargetDir] = useState("");
   const [files, setFiles] = useState("");
@@ -36,7 +31,8 @@ function App() {
   const [chatLanguage, setChatLanguage] = useState(() => localStorage.getItem("chatLanguage") || "English");
   const [aiderPath, setAiderPath] = useState(() => localStorage.getItem("aiderPath") || "aider");
   const [apiPort, setApiPort] = useState(() => Number(localStorage.getItem("apiPort") || 8080));
-  const [promptData, setPromptData] = useState<PromptPayload | null>(null);
+  const [repoMapData, setRepoMapData] = useState<RepoMapPayload | null>(null);
+  const [packedFilesPath, setPackedFilesPath] = useState<string | null>(null);
   const [aiResponse, setAiResponse] = useState("");
   const [logs, setLogs] = useState<string[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -102,11 +98,9 @@ function App() {
   }, [fileEncoding]);
 
   useEffect(() => {
-    const unlisten = listen<PromptPayload>("prompt_received", (event) => {
-      setLogs(prev => [...prev, `--- PromptProxy: Received request from Aider [${new Date().toLocaleTimeString()}] ---`]);
-      setPromptData(event.payload);
-      setAiResponse(""); // Clear previous response
-      setAppState("pending");
+    const unlisten = listen<RepoMapPayload>("repo_map_ready", (event) => {
+      setLogs(prev => [...prev, `--- PromptProxy: Received Repo Map from Aider [${new Date().toLocaleTimeString()}] ---`]);
+      setRepoMapData(event.payload);
     });
 
     const unlistenAiderLog = listen<string>("aider_log", (event) => {
@@ -120,8 +114,8 @@ function App() {
   }, []);
 
   const handleCopyToClipboard = () => {
-    if (promptData?.prompt) {
-      navigator.clipboard.writeText(promptData.prompt).catch((err) => {
+    if (repoMapData?.prompt) {
+      navigator.clipboard.writeText(repoMapData.prompt).catch((err) => {
         console.error("Failed to copy text: ", err);
       });
     }
@@ -129,24 +123,36 @@ function App() {
 
   const handleReset = async () => {
     await invoke("reset_aider_state");
-    setAppState("init");
-    setPromptData(null);
+    setRepoMapData(null);
+    setPackedFilesPath(null);
     setAiResponse("");
   };
 
   const handleApplyPatch = async () => {
-    if (promptData?.request_id) {
-      setLogs(prev => [...prev, `--- PromptProxy: Applying patch via Aider [${new Date().toLocaleTimeString()}] ---`]);
-      await invoke("apply_patch", {
+    setLogs(prev => [...prev, `--- PromptProxy: Applying patch via Aider [${new Date().toLocaleTimeString()}] ---`]);
+    await invoke("apply_patch", {
+      targetDir,
+      response: aiResponse,
+      aiderPath,
+      fileEncoding,
+      gitPath
+    });
+    setAiResponse(""); // Clear response after applying
+  };
+
+  const handlePackFiles = async () => {
+    setLogs(prev => [...prev, `--- PromptProxy: Packing target files... [${new Date().toLocaleTimeString()}] ---`]);
+    try {
+      const path = await invoke<string>("pack_target_files", {
         targetDir,
-        response: aiResponse,
-        aiderPath,
+        files,
         fileEncoding,
-        gitPath
       });
-      setAppState("idle");
-      setPromptData(null);
-      setAiResponse("");
+      setPackedFilesPath(path);
+      setLogs(prev => [...prev, `--- PromptProxy: Successfully packed files to XML ---`]);
+    } catch (error) {
+      setLogs(prev => [...prev, `--- PromptProxy: Error packing files: ${error} ---`]);
+      console.error("Failed to pack files:", error);
     }
   };
 
@@ -173,30 +179,26 @@ function App() {
       gitPath,
       apiPort: Number(apiPort),
     });
-    setAppState("idle");
   };
 
-  const handleDragFile = async (e: DragEvent<HTMLDivElement>) => {
-    if (promptData?.context_file_path && promptData?.icon_file_path) {
-      const isLinux = navigator.userAgent.toLowerCase().includes("linux");
+  const handleDragFile = async (e: DragEvent<HTMLDivElement>, filePath: string, iconPath?: string) => {
+    const isLinux = navigator.userAgent.toLowerCase().includes("linux");
 
-      if (isLinux) {
-        // Linux (X11): WebKitGTKのネイティブドラッグプロトコルに任せ、正しいイベントコンテキストを保持する
-        const uri = 'file://' + promptData.context_file_path;
-        e.dataTransfer?.setData('text/uri-list', uri + '\r\n');
-        e.dataTransfer?.setData('text/plain', promptData.context_file_path);
-        // e.preventDefault() は呼ばない！
-      } else {
-        // Windows/Mac: Tauriのネイティブプラグインを使用
-        e.preventDefault();
-        try {
-          await startDrag({
-            item: [promptData.context_file_path],
-            icon: promptData.icon_file_path,
-          });
-        } catch (error) {
-          console.error("Drag failed:", error);
-        }
+    if (isLinux) {
+      // Linux (X11): Use native drag protocol
+      const uri = 'file://' + filePath;
+      e.dataTransfer?.setData('text/uri-list', uri + '\r\n');
+      e.dataTransfer?.setData('text/plain', filePath);
+    } else {
+      // Windows/Mac: Use Tauri native plugin
+      e.preventDefault();
+      try {
+        await startDrag({
+          item: [filePath],
+          icon: iconPath,
+        });
+      } catch (error) {
+        console.error("Drag failed:", error);
       }
     }
   };
@@ -205,9 +207,7 @@ function App() {
     <div className="app-container">
       <header className="status-header">
         <div className="stepper">
-          <span className={appState === "init" ? "active" : ""}>1. User Input</span> ＞ 
-          <span className={appState === "idle" ? "active" : ""}>2. Aider Running</span> ＞ 
-          <span className={appState === "pending" ? "active" : ""}>3. LLM Proxy Response</span>
+          <span>A. RepoMap</span> | <span>B. Target Files</span> | <span>C. Apply Patch</span>
         </div>
         <button onClick={handleReset} className="reset-button">🔄 Reload</button>
       </header>
@@ -300,129 +300,92 @@ function App() {
             </div>
           </div>
         ) : (
-          <>
-            {/* 1. ユーザー指示領域 */}
-            <div className={`card ${appState !== "init" ? "inactive" : ""}`}>
-              <h3>1. User Input</h3>
-              <div className="form-group">
-                <label>Target Project Directory</label>
-                <div className="input-group">
-                  <input
-                    type="text"
-                    value={targetDir}
-                    onChange={(e) => setTargetDir(e.target.value)}
-                    placeholder="/path/to/your/project"
-                  />
-                  <button onClick={handleSelectDirectory}>Select Folder</button>
+          <div className="tool-container">
+            {/* Global Settings */}
+            <div className="card">
+                <h3>Global Settings</h3>
+                <div className="form-group">
+                    <label>Target Project Directory</label>
+                    <div className="input-group">
+                        <input type="text" value={targetDir} onChange={(e) => setTargetDir(e.target.value)} placeholder="/path/to/your/project" />
+                        <button onClick={handleSelectDirectory}>Select Folder</button>
+                    </div>
                 </div>
-              </div>
-              <div className="form-group">
-                <label>File Encoding (e.g. cp932. Leave blank for default)</label>
-                <input
-                  type="text"
-                  value={fileEncoding}
-                  onChange={(e) => setFileEncoding(e.target.value)}
-                  placeholder="Leave blank for default"
-                />
-              </div>
-              <div className="form-group">
-                <label>Target Files (Space-separated for multiple. Can be blank)</label>
-                <input
-                  type="text"
-                  value={files}
-                  onChange={(e) => setFiles(e.target.value)}
-                  placeholder="src/main.rs src/lib.rs"
-                />
-              </div>
-              <div className="form-group">
-                <label>Operation Mode</label>
-                <div className="mode-selector">
-                  <label>
-                    <input
-                      type="radio"
-                      value="edit"
-                      checked={mode === 'edit'}
-                      onChange={() => setMode('edit')}
-                    />
-                    Edit Code (Edit)
-                  </label>
-                  <label>
-                    <input
-                      type="radio"
-                      value="ask"
-                      checked={mode === 'ask'}
-                      onChange={() => setMode('ask')}
-                    />
-                    Ask about Repository (Ask)
-                  </label>
+                <div className="form-group">
+                    <label>File Encoding (e.g., cp932)</label>
+                    <input type="text" value={fileEncoding} onChange={(e) => setFileEncoding(e.target.value)} placeholder="Leave blank for default" />
                 </div>
-              </div>
-              <div className="form-group">
-                <label>Instructions for Aider</label>
-                <textarea
-                  value={instruction}
-                  onChange={(e) => setInstruction(e.target.value)}
-                  placeholder="Fix the bug in..."
-                />
-              </div>
-              <button onClick={handleLaunchAider}>
-                Run Aider in Background
-              </button>
             </div>
 
-            {/* 2. LLMへの指示領域 */}
-            <div className={`card ${appState !== "pending" ? "inactive" : ""}`}>
-              <h3>2. Instructions for LLM (Aider -&gt; LLM)</h3>
-              {promptData ? (
-                <div className="prompt-content">
-                  <div className="info-box">
-                    <h4>Context File</h4>
-                    <div className="draggable-file-wrapper">
-                      <div
-                        className="draggable-file"
-                        draggable={true}
-                        onDragStart={handleDragFile}
-                      >
-                        <svg width="64" height="80" viewBox="0 0 100 120" xmlns="http://www.w3.org/2000/svg">
-                          <path d="M0 4C0 1.8 1.8 0 4 0H65L100 35V116C100 118.2 98.2 120 96 120H4C1.8 120 0 118.2 0 116V4Z" fill="#CF84E1" />
-                          <path d="M65 0V31C65 33.2 66.8 35 69 35H100L65 0Z" fill="#B463C8" />
-                          <text x="50" y="78" fill="white" fontSize="36" fontFamily="monospace" textAnchor="middle" fontWeight="bold">&lt;/&gt;</text>
-                        </svg>
-                        <span className="file-name">context.xml</span>
+            {/* Block A: Repo Map Generation */}
+            <div className="card">
+                <h3>A. Generate Repo Map & Prompt</h3>
+                <div className="form-group">
+                    <label>Operation Mode</label>
+                    <div className="mode-selector">
+                        <label><input type="radio" value="edit" checked={mode === 'edit'} onChange={() => setMode('edit')}/> Edit Code</label>
+                        <label><input type="radio" value="ask" checked={mode === 'ask'} onChange={() => setMode('ask')}/> Ask about Repo</label>
+                    </div>
+                </div>
+                <div className="form-group">
+                    <label>Instructions for LLM</label>
+                    <textarea value={instruction} onChange={(e) => setInstruction(e.target.value)} placeholder="Fix the bug in..."/>
+                </div>
+                <button onClick={handleLaunchAider}>Generate Repo Map & Prompt</button>
+                {repoMapData && (
+                    <div className="prompt-content">
+                        <div className="info-box">
+                            <h4>RepoMap File</h4>
+                            <div className="draggable-file-wrapper">
+                                <div className="draggable-file" draggable={true} onDragStart={(e) => handleDragFile(e, repoMapData.repo_map_file_path, repoMapData.icon_file_path)}>
+                                    <svg width="64" height="80" viewBox="0 0 100 120"><path d="M0 4C0 1.8 1.8 0 4 0H65L100 35V116C100 118.2 98.2 120 96 120H4C1.8 120 0 118.2 0 116V4Z" fill="#CF84E1"/><path d="M65 0V31C65 33.2 66.8 35 69 35H100L65 0Z" fill="#B463C8"/><text x="50" y="78" fill="white" fontSize="36" fontFamily="monospace" textAnchor="middle" fontWeight="bold">&lt;/&gt;</text></svg>
+                                    <span className="file-name">repo_map.xml</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div className="info-box">
+                            <h4>Prompt</h4>
+                            <div className="prompt-display">
+                                <pre>{repoMapData.prompt}</pre>
+                                <button onClick={handleCopyToClipboard}>Copy</button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+            </div>
+
+            {/* Block B: Target Files XML Packing */}
+            <div className="card">
+                <h3>B. Pack Target Files to XML</h3>
+                <div className="form-group">
+                    <label>Target Files (Space-separated)</label>
+                    <input type="text" value={files} onChange={(e) => setFiles(e.target.value)} placeholder="src/main.rs src/lib.rs"/>
+                </div>
+                <button onClick={handlePackFiles}>Pack Target Files to XML</button>
+                {packedFilesPath && repoMapData?.icon_file_path && (
+                  <div className="info-box" style={{marginTop: '1em'}}>
+                      <h4>Packed Files</h4>
+                      <div className="draggable-file-wrapper">
+                          <div className="draggable-file" draggable={true} onDragStart={(e) => handleDragFile(e, packedFilesPath, repoMapData.icon_file_path)}>
+                              <svg width="64" height="80" viewBox="0 0 100 120"><path d="M0 4C0 1.8 1.8 0 4 0H65L100 35V116C100 118.2 98.2 120 96 120H4C1.8 120 0 118.2 0 116V4Z" fill="#84A1E1"/><path d="M65 0V31C65 33.2 66.8 35 69 35H100L65 0Z" fill="#637BC8"/><text x="50" y="78" fill="white" fontSize="36" fontFamily="monospace" textAnchor="middle" fontWeight="bold">&lt;/&gt;</text></svg>
+                              <span className="file-name">target_files.xml</span>
+                          </div>
                       </div>
-                    </div>
                   </div>
-                  <div className="info-box">
-                    <h4>Prompt</h4>
-                    <div className="prompt-display">
-                      <pre>{promptData.prompt}</pre>
-                      <button onClick={handleCopyToClipboard}>Copy</button>
-                    </div>
-                  </div>
-                </div>
-              ) : appState === "idle" ? (
-                <p className="placeholder-text">⏳ Aider is generating context...</p>
-              ) : (
-                <p className="placeholder-text">Prompt will be generated here when Aider runs.</p>
-              )}
+                )}
             </div>
 
-            {/* 3. LLMからの指示領域 */}
-            <div className={`card ${appState !== "pending" ? "inactive" : ""}`}>
-              <h3>3. Response from LLM (LLM -&gt; Aider)</h3>
-              <div className="response-content">
-                <textarea
-                  value={aiResponse}
-                  onChange={(e) => setAiResponse(e.target.value)}
-                  placeholder="Paste AI response here..."
-                  disabled={appState !== "pending"}
-                />
-                <div className="button-group">
-                  <button onClick={handleApplyPatch} disabled={appState !== "pending"}>Apply Patch</button>
+            {/* Block C: Patch Application */}
+            <div className="card">
+                <h3>C. Apply Patch</h3>
+                <div className="response-content">
+                    <textarea value={aiResponse} onChange={(e) => setAiResponse(e.target.value)} placeholder="Paste AI response with SEARCH/REPLACE blocks here..."/>
+                    <div className="button-group">
+                        <button onClick={handleApplyPatch}>Apply Patch</button>
+                    </div>
                 </div>
-              </div>
             </div>
-          </>
+          </div>
         )}
       </main>
 
