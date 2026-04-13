@@ -256,6 +256,24 @@ async fn apply_patch(
     }
     command.env("PATH", path_env);
     command.env("PYTHONUTF8", "1");
+    command.env("AIDER_CHECK_UPDATE", "false"); // アップデートチェックの無効化
+
+    // AiderSessionStateから、PromptProxyが待ち受けているローカルポートを取得
+    let api_port = {
+        let state_guard = app_handle.state::<crate::AiderSessionState>();
+        let lock = state_guard.0.lock().unwrap();
+        lock.as_ref().map(|s| s.api_port).unwrap_or(8080)
+    };
+
+    // env_removeを使用せず、引数でダミー設定を渡すことで初期化通信をローカルに上書きする
+    command.args([
+        "--openai-api-base",
+        &format!("http://127.0.0.1:{}/v1", api_port),
+        "--openai-api-key",
+        "dummy",
+        "--model",
+        "gpt-4o",
+    ]);
 
     command.arg("--apply").arg(&patch_file_path);
     command.arg("--yes");
