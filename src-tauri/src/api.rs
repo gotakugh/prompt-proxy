@@ -118,8 +118,16 @@ async fn chat_completions_handler(
         let dir_path = std::path::Path::new(&target_dir);
         for file_name in target_files.split_whitespace() {
             let file_path = dir_path.join(file_name);
+            // 実際にOSが参照する絶対パスを取得（失敗時は元のパスを使用）
+            let abs_path = std::fs::canonicalize(&file_path).unwrap_or_else(|_| file_path.clone());
+
             match std::fs::read(&file_path) {
                 Ok(bytes) => {
+                    // 成功ログ：ファイルの絶対パスとバイト数をUIに出力
+                    let success_msg = format!("=> [PromptProxy] Read file: {} ({} bytes)", abs_path.display(), bytes.len());
+                    println!("{}", success_msg);
+                    let _ = app_handle.emit("aider_log", success_msg);
+
                     let mut decoded_content = String::new();
                     let enc_trim = file_enc_str.trim();
                     if !enc_trim.is_empty() {
@@ -140,8 +148,8 @@ async fn chat_completions_handler(
                     ));
                 }
                 Err(e) => {
-                    // ファイルが読めなかった場合、UIの黒いターミナル領域にエラーを表示して知らせる
-                    let err_msg = format!("=> [PromptProxy] Error: Could not read target file: {:?} - {}", file_path, e);
+                    // エラーログ：オープン/リード失敗時のパスとOSのエラー理由（NotFound等）をUIに出力
+                    let err_msg = format!("=> [PromptProxy] Error: Failed to open/read file: {} - {}", abs_path.display(), e);
                     println!("{}", err_msg);
                     let _ = app_handle.emit("aider_log", err_msg);
                 }
