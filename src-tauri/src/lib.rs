@@ -15,6 +15,7 @@ pub struct AiderSession {
     pub aider_path: String,
     pub file_encoding: String,
     pub git_path: String,
+    pub map_tokens: String,
     pub api_port: u16,
 }
 pub struct AiderSessionState(pub Mutex<Option<AiderSession>>);
@@ -34,6 +35,7 @@ fn launch_aider_batch(
     aider_path: String,
     file_encoding: String,
     git_path: String,
+    map_tokens: String,
     api_port: u16,
     app_handle: tauri::AppHandle,
     session_state: tauri::State<'_, AiderSessionState>,
@@ -47,11 +49,12 @@ fn launch_aider_batch(
         aider_path: aider_path.clone(),
         file_encoding: file_encoding.clone(),
         git_path: git_path.clone(),
+        map_tokens: map_tokens.clone(),
         api_port,
     };
     *session_state.0.lock().unwrap() = Some(session);
 
-    spawn_aider_process(&app_handle, target_dir, files, message, chat_language, aider_path, file_encoding, api_port, git_path);
+    spawn_aider_process(&app_handle, target_dir, files, message, chat_language, aider_path, file_encoding, api_port, git_path, map_tokens);
 }
 
 pub fn resolve_encoding_labels(input: &str) -> (String, String) {
@@ -71,7 +74,7 @@ pub fn resolve_encoding_labels(input: &str) -> (String, String) {
     }
 }
 
-pub fn spawn_aider_process(app_handle: &tauri::AppHandle, target_dir: String, files: String, message: String, chat_language: String, aider_path: String, file_encoding: String, api_port: u16, git_path: String) {
+pub fn spawn_aider_process(app_handle: &tauri::AppHandle, target_dir: String, files: String, message: String, chat_language: String, aider_path: String, file_encoding: String, api_port: u16, git_path: String, map_tokens: String) {
     let mut path_parts = aider_path.trim().split_whitespace();
     let program = path_parts.next().unwrap_or("aider");
     let mut command = Command::new(program);
@@ -105,6 +108,10 @@ pub fn spawn_aider_process(app_handle: &tauri::AppHandle, target_dir: String, fi
         "--yes",
         "--no-analytics",
     ]);
+
+    if !map_tokens.trim().is_empty() {
+        command.arg("--map-tokens").arg(map_tokens.trim());
+    }
 
     let temp_dir = std::env::temp_dir();
     let msg_file_path = temp_dir.join(format!("aider_msg_{}.txt", std::process::id()));

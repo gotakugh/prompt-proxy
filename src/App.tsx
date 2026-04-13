@@ -27,6 +27,7 @@ function App() {
   const [files, setFiles] = useState("");
   const [instruction, setInstruction] = useState("");
   const [fileEncoding, setFileEncoding] = useState(() => localStorage.getItem("fileEncoding") || "");
+  const [mapTokens, setMapTokens] = useState(() => localStorage.getItem("mapTokens") || "");
   const [gitPath, setGitPath] = useState(() => localStorage.getItem("gitPath") || "");
   const [chatLanguage, setChatLanguage] = useState(() => localStorage.getItem("chatLanguage") || "English");
   const [aiderPath, setAiderPath] = useState(() => localStorage.getItem("aiderPath") || "aider");
@@ -96,6 +97,10 @@ function App() {
   useEffect(() => {
     localStorage.setItem("fileEncoding", fileEncoding);
   }, [fileEncoding]);
+
+  useEffect(() => {
+    localStorage.setItem("mapTokens", mapTokens);
+  }, [mapTokens]);
 
   useEffect(() => {
     const unlisten = listen<RepoMapPayload>("repo_map_ready", (event) => {
@@ -177,6 +182,7 @@ function App() {
       aiderPath,
       fileEncoding,
       gitPath,
+      mapTokens,
       apiPort: Number(apiPort),
     });
   };
@@ -321,6 +327,10 @@ function App() {
                 <div className="form-group">
                     <label>File Encoding (e.g., cp932)</label>
                     <input type="text" value={fileEncoding} onChange={(e) => setFileEncoding(e.target.value)} placeholder="Leave blank for default" />
+                </div>
+                <div className="form-group">
+                    <label>Map Tokens (Optional. e.g., 1024)</label>
+                    <input type="number" value={mapTokens} onChange={(e) => setMapTokens(e.target.value)} placeholder="Leave blank for Aider default" />
                 </div>
             </div>
 
