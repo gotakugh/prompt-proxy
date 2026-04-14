@@ -193,14 +193,14 @@ function App() {
     });
   };
 
-  const handleDragFile = async (e: DragEvent<HTMLDivElement>, filePath: string, iconPath?: string) => {
+  const handleDragFile = async (e: DragEvent<HTMLDivElement>, filePaths: string[], iconPath?: string) => {
     const isLinux = navigator.userAgent.toLowerCase().includes("linux");
 
     if (isLinux) {
-      // Linux (X11): Use native drag protocol
-      const uri = 'file://' + filePath;
-      e.dataTransfer?.setData('text/uri-list', uri + '\r\n');
-      e.dataTransfer?.setData('text/plain', filePath);
+      // Linux (X11/Wayland): Use native drag protocol for multiple files
+      const uriList = filePaths.map(p => 'file://' + p).join('\r\n') + '\r\n';
+      e.dataTransfer?.setData('text/uri-list', uriList);
+      e.dataTransfer?.setData('text/plain', filePaths.join('\n'));
     } else {
       // Windows/Mac: Use Tauri native plugin
       e.preventDefault();
@@ -213,7 +213,7 @@ function App() {
 
       try {
         await startDrag({
-          item: [filePath],
+          item: filePaths, // 配列をそのまま渡す
           icon: iconPath,
         });
       } catch (error) {
@@ -364,7 +364,7 @@ function App() {
                         <div className="info-box">
                             <h4>RepoMap File</h4>
                             <div className="draggable-file-wrapper">
-                                <div className="draggable-file" draggable={true} onDragStart={(e) => handleDragFile(e, repoMapData.repo_map_file_path, repoMapData.icon_file_path)}>
+                                <div className="draggable-file" draggable={true} onDragStart={(e) => handleDragFile(e, [repoMapData.repo_map_file_path], repoMapData.icon_file_path)}>
                                     <svg width="64" height="80" viewBox="0 0 100 120"><path d="M0 4C0 1.8 1.8 0 4 0H65L100 35V116C100 118.2 98.2 120 96 120H4C1.8 120 0 118.2 0 116V4Z" fill="#CF84E1"/><path d="M65 0V31C65 33.2 66.8 35 69 35H100L65 0Z" fill="#B463C8"/><text x="50" y="78" fill="white" fontSize="36" fontFamily="monospace" textAnchor="middle" fontWeight="bold">&lt;/&gt;</text></svg>
                                     <span className="file-name">repo_map.xml</span>
                                 </div>
@@ -393,8 +393,17 @@ function App() {
                   <div className="info-box" style={{marginTop: '1em'}}>
                       <h4>Packed Files (Split)</h4>
                       <div className="draggable-file-wrapper" style={{ flexWrap: 'wrap' }}>
+                          
+                          {/* NEW: 複数ファイルがある場合のみ「一括ドラッグ」アイコンを表示 */}
+                          {packedFilesPaths.length > 1 && (
+                              <div className="draggable-file" style={{ backgroundColor: 'rgba(57, 108, 216, 0.1)', borderColor: '#396cd8' }} draggable={true} onDragStart={(e) => handleDragFile(e, packedFilesPaths, repoMapData.icon_file_path!)}>
+                                  <svg width="64" height="80" viewBox="0 0 100 120"><path d="M0 4C0 1.8 1.8 0 4 0H65L100 35V116C100 118.2 98.2 120 96 120H4C1.8 120 0 118.2 0 116V4Z" fill="#396CD8"/><path d="M65 0V31C65 33.2 66.8 35 69 35H100L65 0Z" fill="#2952A3"/><text x="50" y="78" fill="white" fontSize="24" fontFamily="monospace" textAnchor="middle" fontWeight="bold">ALL</text></svg>
+                                  <span className="file-name" style={{ fontWeight: 'bold', color: '#396cd8' }}>Drag All ({packedFilesPaths.length})</span>
+                              </div>
+                          )}
+
                           {packedFilesPaths.map((path, index) => (
-                              <div key={index} className="draggable-file" draggable={true} onDragStart={(e) => handleDragFile(e, path, repoMapData.icon_file_path!)}>
+                              <div key={index} className="draggable-file" draggable={true} onDragStart={(e) => handleDragFile(e, [path], repoMapData.icon_file_path!)}>
                                   <svg width="64" height="80" viewBox="0 0 100 120"><path d="M0 4C0 1.8 1.8 0 4 0H65L100 35V116C100 118.2 98.2 120 96 120H4C1.8 120 0 118.2 0 116V4Z" fill="#84A1E1"/><path d="M65 0V31C65 33.2 66.8 35 69 35H100L65 0Z" fill="#637BC8"/><text x="50" y="78" fill="white" fontSize="36" fontFamily="monospace" textAnchor="middle" fontWeight="bold">&lt;/&gt;</text></svg>
                                   <span className="file-name">target_files_{index + 1}.xml</span>
                               </div>
