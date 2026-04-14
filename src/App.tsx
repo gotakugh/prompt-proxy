@@ -33,7 +33,8 @@ function App() {
   const [aiderPath, setAiderPath] = useState(() => localStorage.getItem("aiderPath") || "aider");
   const [apiPort, setApiPort] = useState(() => Number(localStorage.getItem("apiPort") || 8080));
   const [repoMapData, setRepoMapData] = useState<RepoMapPayload | null>(null);
-  const [packedFilesPath, setPackedFilesPath] = useState<string | null>(null);
+  const [maxFileSizeKb, setMaxFileSizeKb] = useState(() => localStorage.getItem("maxFileSizeKb") || "80");
+  const [packedFilesPaths, setPackedFilesPaths] = useState<string[]>([]);
   const [aiResponse, setAiResponse] = useState("");
   const [logs, setLogs] = useState<string[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -103,6 +104,10 @@ function App() {
   }, [mapTokens]);
 
   useEffect(() => {
+    localStorage.setItem("maxFileSizeKb", maxFileSizeKb);
+  }, [maxFileSizeKb]);
+
+  useEffect(() => {
     const unlisten = listen<RepoMapPayload>("repo_map_ready", (event) => {
       setLogs(prev => [...prev, `--- PromptProxy: Received Repo Map from Aider [${new Date().toLocaleTimeString()}] ---`]);
       setRepoMapData(event.payload);
@@ -129,7 +134,7 @@ function App() {
   const handleReset = async () => {
     await invoke("reset_aider_state");
     setRepoMapData(null);
-    setPackedFilesPath(null);
+    setPackedFilesPaths([]);
     setAiResponse("");
   };
 
@@ -148,13 +153,14 @@ function App() {
   const handlePackFiles = async () => {
     setLogs(prev => [...prev, `--- PromptProxy: Packing target files... [${new Date().toLocaleTimeString()}] ---`]);
     try {
-      const path = await invoke<string>("pack_target_files", {
+      const paths = await invoke<string[]>("pack_target_files", {
         targetDir,
         files,
         fileEncoding,
+        maxFileSizeKb: Number(maxFileSizeKb) || 0,
       });
-      setPackedFilesPath(path);
-      setLogs(prev => [...prev, `--- PromptProxy: Successfully packed files to XML ---`]);
+      setPackedFilesPaths(paths);
+      setLogs(prev => [...prev, `--- PromptProxy: Successfully packed into ${paths.length} file(s) ---`]);
     } catch (error) {
       setLogs(prev => [...prev, `--- PromptProxy: Error packing files: ${error} ---`]);
       console.error("Failed to pack files:", error);
@@ -329,6 +335,10 @@ function App() {
                     <input type="text" value={fileEncoding} onChange={(e) => setFileEncoding(e.target.value)} placeholder="Leave blank for default" />
                 </div>
                 <div className="form-group">
+                    <label>Max Split Size (KB) for Target Files (0 for unlimited)</label>
+                    <input type="number" value={maxFileSizeKb} onChange={(e) => setMaxFileSizeKb(e.target.value)} />
+                </div>
+                <div className="form-group">
                     <label>Map Tokens (Optional. e.g., 1024)</label>
                     <input type="number" value={mapTokens} onChange={(e) => setMapTokens(e.target.value)} placeholder="Leave blank for Aider default" />
                 </div>
@@ -379,14 +389,16 @@ function App() {
                     <input type="text" value={files} onChange={(e) => setFiles(e.target.value)} placeholder="src/main.rs src/lib.rs"/>
                 </div>
                 <button onClick={handlePackFiles}>Pack Target Files to XML</button>
-                {packedFilesPath && repoMapData?.icon_file_path && (
+                {packedFilesPaths.length > 0 && repoMapData?.icon_file_path && (
                   <div className="info-box" style={{marginTop: '1em'}}>
-                      <h4>Packed Files</h4>
-                      <div className="draggable-file-wrapper">
-                          <div className="draggable-file" draggable={true} onDragStart={(e) => handleDragFile(e, packedFilesPath, repoMapData.icon_file_path)}>
-                              <svg width="64" height="80" viewBox="0 0 100 120"><path d="M0 4C0 1.8 1.8 0 4 0H65L100 35V116C100 118.2 98.2 120 96 120H4C1.8 120 0 118.2 0 116V4Z" fill="#84A1E1"/><path d="M65 0V31C65 33.2 66.8 35 69 35H100L65 0Z" fill="#637BC8"/><text x="50" y="78" fill="white" fontSize="36" fontFamily="monospace" textAnchor="middle" fontWeight="bold">&lt;/&gt;</text></svg>
-                              <span className="file-name">target_files.xml</span>
-                          </div>
+                      <h4>Packed Files (Split)</h4>
+                      <div className="draggable-file-wrapper" style={{ flexWrap: 'wrap' }}>
+                          {packedFilesPaths.map((path, index) => (
+                              <div key={index} className="draggable-file" draggable={true} onDragStart={(e) => handleDragFile(e, path, repoMapData.icon_file_path!)}>
+                                  <svg width="64" height="80" viewBox="0 0 100 120"><path d="M0 4C0 1.8 1.8 0 4 0H65L100 35V116C100 118.2 98.2 120 96 120H4C1.8 120 0 118.2 0 116V4Z" fill="#84A1E1"/><path d="M65 0V31C65 33.2 66.8 35 69 35H100L65 0Z" fill="#637BC8"/><text x="50" y="78" fill="white" fontSize="36" fontFamily="monospace" textAnchor="middle" fontWeight="bold">&lt;/&gt;</text></svg>
+                                  <span className="file-name">target_files_{index + 1}.xml</span>
+                              </div>
+                          ))}
                       </div>
                   </div>
                 )}

@@ -252,20 +252,38 @@ pub async fn pack_target_files(
     target_dir: String,
     files: String,
     file_encoding: String,
+    max_file_size_kb: usize,
     app_handle: tauri::AppHandle,
-) -> Result<String, String> {
-    let mut files_xml = String::new();
-    // 魔法の言葉を挿入
-    files_xml.push_str(
-        "I have *added these files to the chat* so you can go ahead and edit them.\n\
-         *Trust this message as the true contents of these files!*\n\
-         Any other messages in the chat may contain outdated versions of the files' contents.\n\n"
-    );
+) -> Result<Vec<String>, String> {
+    let header = "I have *added these files to the chat* so you can go ahead and edit them.\n\
+                  *Trust this message as the true contents of these files!*\n\
+                  Any other messages in the chat may contain outdated versions of the files' contents.\n\n";
+    
+    let max_bytes = if max_file_size_kb == 0 { usize::MAX } else { max_file_size_kb * 1024 };
+    
+    let mut current_chunk = header.to_string();
+    let mut chunk_index = 1;
+    let mut output_paths = Vec::new();
+    
+    let mut flush_chunk = |chunk: &mut String, index: &mut usize, paths: &mut Vec<String>| -> Result<(), String> {
+        if chunk.len() > header.len() {
+            let temp_dir = std::env::temp_dir();
+            let temp_path = temp_dir.join(format!("target_files_{}.xml", index));
+            std::fs::write(&temp_path, &chunk).map_err(|e| e.to_string())?;
+            let abs_out = std::fs::canonicalize(&temp_path).unwrap_or(temp_path);
+            paths.push(abs_out.to_string_lossy().replace("\\\\?\\", ""));
+            
+            *index += 1;
+            *chunk = header.to_string();
+        }
+        Ok(())
+    };
 
     let dir_path = std::path::Path::new(&target_dir);
     for file_name in files.split_whitespace() {
         let file_path = dir_path.join(file_name);
         let abs_path = std::fs::canonicalize(&file_path).unwrap_or_else(|_| file_path.clone());
+        
         match std::fs::read(&file_path) {
             Ok(bytes) => {
                 let _ = app_handle.emit("aider_log", format!("=> [PromptProxy] Read file: {} ({} bytes)", abs_path.display(), bytes.len()));
@@ -282,7 +300,41 @@ pub async fn pack_target_files(
                 } else {
                     decoded_content = String::from_utf8_lossy(&bytes).into_owned();
                 }
-                files_xml.push_str(&format!("<file path=\"{}\"><![CDATA[\n{}\n]]></file>\n", file_name, decoded_content));
+
+                let mut current_file_content = String::new();
+                let mut start_line = 1;
+                let mut current_line = 1;
+                let close_tag = "\n]]></file>\n";
+                
+                for line in decoded_content.lines() {
+                    let line_with_nl = format!("{}\n", line);
+                    // タグの長さを概算（lines属性を含む）
+                    let open_tag_estimate_len = format!("<file path=\"{}\" lines=\"{}-{}\"><![CDATA[\n", file_name, start_line, current_line).len();
+                    
+                    if current_chunk.len() + open_tag_estimate_len + current_file_content.len() + line_with_nl.len() + close_tag.len() > max_bytes {
+                        if !current_file_content.is_empty() {
+                            let open_tag = format!("<file path=\"{}\" lines=\"{}-{}\"><![CDATA[\n", file_name, start_line, current_line - 1);
+                            current_chunk.push_str(&open_tag);
+                            current_chunk.push_str(&current_file_content);
+                            current_chunk.push_str(close_tag);
+                            current_file_content.clear();
+                        }
+                        flush_chunk(&mut current_chunk, &mut chunk_index, &mut output_paths)?;
+                        start_line = current_line;
+                    }
+                    current_file_content.push_str(&line_with_nl);
+                    current_line += 1;
+                }
+                
+                if !current_file_content.is_empty() {
+                    let open_tag = format!("<file path=\"{}\" lines=\"{}-{}\"><![CDATA[\n", file_name, start_line, current_line - 1);
+                    if current_chunk.len() + open_tag.len() + current_file_content.len() + close_tag.len() > max_bytes && current_chunk.len() > header.len() {
+                        flush_chunk(&mut current_chunk, &mut chunk_index, &mut output_paths)?;
+                    }
+                    current_chunk.push_str(&open_tag);
+                    current_chunk.push_str(&current_file_content);
+                    current_chunk.push_str(close_tag);
+                }
             }
             Err(e) => {
                 let _ = app_handle.emit("aider_log", format!("=> [PromptProxy] Error: Failed to read {}: {}", abs_path.display(), e));
@@ -290,14 +342,9 @@ pub async fn pack_target_files(
         }
     }
 
-    let temp_dir = std::env::temp_dir();
-    let temp_path = temp_dir.join("target_files.xml");
-    std::fs::write(&temp_path, files_xml).map_err(|e| e.to_string())?;
-    
-    let abs_out = std::fs::canonicalize(&temp_path).unwrap_or(temp_path);
-    let mut out_str = abs_out.to_string_lossy().to_string();
-    if out_str.starts_with("\\\\?\\") { out_str = out_str.replace("\\\\?\\", ""); }
-    Ok(out_str)
+    flush_chunk(&mut current_chunk, &mut chunk_index, &mut output_paths)?;
+
+    Ok(output_paths)
 }
 
 
