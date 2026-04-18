@@ -388,7 +388,10 @@ pub fn run() {
             api::start_api_server,
             reset_aider_state,
             apply_patch,
-            api::pack_target_files
+            api::pack_target_files,
+            api::load_config,
+            api::save_config,
+            api::open_config_dir
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application");

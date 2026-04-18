@@ -413,3 +413,78 @@ pub async fn start_api_server(
 
     Ok(())
 }
+
+use serde::{Deserialize, Serialize};
+use std::fs;
+use std::path::PathBuf;
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct AppConfig {
+    pub target_dir: String,
+    pub file_encoding: String,
+    pub map_tokens: String,
+    pub max_file_size_kb: String,
+    pub output_extension: String,
+    pub git_path: String,
+    pub aider_path: String,
+    pub chat_language: String,
+    pub api_port: String,
+    pub prompt_settings: String,
+}
+
+impl Default for AppConfig {
+    fn default() -> Self {
+        Self {
+            target_dir: "".into(),
+            file_encoding: "".into(),
+            map_tokens: "".into(),
+            max_file_size_kb: "80".into(),
+            output_extension: "xml".into(),
+            git_path: "".into(),
+            aider_path: "aider".into(),
+            chat_language: "English".into(),
+            api_port: "8080".into(),
+            prompt_settings: "".into(),
+        }
+    }
+}
+
+// 実行ファイル（.exe）が存在するディレクトリを取得する
+fn get_config_path() -> Result<PathBuf, String> {
+    let exe_path = std::env::current_exe().map_err(|e| e.to_string())?;
+    let exe_dir = exe_path.parent().ok_or("Failed to get exe directory")?;
+    Ok(exe_dir.join("config.json"))
+}
+
+#[tauri::command]
+pub async fn load_config() -> Result<AppConfig, String> {
+    let path = get_config_path()?;
+    if !path.exists() {
+        return Ok(AppConfig::default());
+    }
+    let content = fs::read_to_string(&path).map_err(|e| e.to_string())?;
+    serde_json::from_str(&content).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn save_config(config: AppConfig) -> Result<(), String> {
+    let path = get_config_path()?;
+    let content = serde_json::to_string_pretty(&config).map_err(|e| e.to_string())?;
+    fs::write(&path, content).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn open_config_dir() -> Result<(), String> {
+    let exe_path = std::env::current_exe().map_err(|e| e.to_string())?;
+    let path = exe_path.parent().ok_or("Failed to get exe directory")?;
+    
+    if path.exists() {
+        #[cfg(target_os = "windows")]
+        { std::process::Command::new("explorer").arg(path).spawn().map_err(|e| e.to_string())?; }
+        #[cfg(target_os = "linux")]
+        { std::process::Command::new("xdg-open").arg(path).spawn().map_err(|e| e.to_string())?; }
+        #[cfg(target_os = "macos")]
+        { std::process::Command::new("open").arg(path).spawn().map_err(|e| e.to_string())?; }
+    }
+    Ok(())
+}

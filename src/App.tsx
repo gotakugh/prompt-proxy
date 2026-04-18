@@ -36,20 +36,33 @@ interface RepoMapPayload {
   prompt: string;
 }
 
+interface AppConfig {
+  target_dir: string;
+  file_encoding: string;
+  map_tokens: string;
+  max_file_size_kb: string;
+  output_extension: string;
+  git_path: string;
+  aider_path: string;
+  chat_language: string;
+  api_port: string;
+  prompt_settings: string;
+}
+
 function App() {
   const [mode, setMode] = useState<"edit" | "ask">("edit");
   const [targetDir, setTargetDir] = useState("");
   const [files, setFiles] = useState("");
   const [instruction, setInstruction] = useState("");
-  const [fileEncoding, setFileEncoding] = useState(() => localStorage.getItem("fileEncoding") || "");
-  const [mapTokens, setMapTokens] = useState(() => localStorage.getItem("mapTokens") || "");
-  const [outputExtension, setOutputExtension] = useState(() => localStorage.getItem("outputExtension") || "xml");
-  const [gitPath, setGitPath] = useState(() => localStorage.getItem("gitPath") || "");
-  const [chatLanguage, setChatLanguage] = useState(() => localStorage.getItem("chatLanguage") || "English");
-  const [aiderPath, setAiderPath] = useState(() => localStorage.getItem("aiderPath") || "aider");
-  const [apiPort, setApiPort] = useState(() => Number(localStorage.getItem("apiPort") || 8080));
+  const [fileEncoding, setFileEncoding] = useState("");
+  const [mapTokens, setMapTokens] = useState("");
+  const [outputExtension, setOutputExtension] = useState("xml");
+  const [gitPath, setGitPath] = useState("");
+  const [chatLanguage, setChatLanguage] = useState("English");
+  const [aiderPath, setAiderPath] = useState("aider");
+  const [apiPort, setApiPort] = useState(8080);
   const [repoMapData, setRepoMapData] = useState<RepoMapPayload | null>(null);
-  const [maxFileSizeKb, setMaxFileSizeKb] = useState(() => localStorage.getItem("maxFileSizeKb") || "80");
+  const [maxFileSizeKb, setMaxFileSizeKb] = useState("80");
   const [packedFilesPaths, setPackedFilesPaths] = useState<string[]>([]);
   const [aiResponse, setAiResponse] = useState("");
   const [logs, setLogs] = useState<string[]>([]);
@@ -65,67 +78,66 @@ function App() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [logs]);
 
-  // Load settings on mount
-  useEffect(() => {
-    const savedSettings = localStorage.getItem("promptSettings");
-    if (savedSettings) {
-      try {
-        const settings = JSON.parse(savedSettings);
-        setUseCustomPrompt(settings.useCustomPrompt ?? false);
-        setCustomEditPrompt(settings.customEditPrompt ?? "");
-        setCustomAskPrompt(settings.customAskPrompt ?? "");
-      } catch (e) {
-        console.error("Failed to parse settings from localStorage", e);
-      }
-    }
-  }, []);
+  const isInitialLoad = useRef(true);
 
-  // Reset backend state on component mount (e.g., page refresh)
+  // Load config from file on mount
   useEffect(() => {
     invoke("reset_aider_state").catch(console.error);
+    
+    invoke<AppConfig>("load_config").then(config => {
+      setTargetDir(config.target_dir);
+      setFileEncoding(config.file_encoding);
+      setMapTokens(config.map_tokens);
+      setMaxFileSizeKb(config.max_file_size_kb);
+      setOutputExtension(config.output_extension);
+      setGitPath(config.git_path);
+      setAiderPath(config.aider_path);
+      setChatLanguage(config.chat_language);
+      setApiPort(Number(config.api_port));
+
+      if (config.prompt_settings) {
+        try {
+          const settings = JSON.parse(config.prompt_settings);
+          setUseCustomPrompt(settings.useCustomPrompt ?? false);
+          setCustomEditPrompt(settings.customEditPrompt ?? DEFAULT_EDIT_PROMPT);
+          setCustomAskPrompt(settings.customAskPrompt ?? DEFAULT_ASK_PROMPT);
+        } catch (e) {
+          console.error("Failed to parse prompt_settings from config.json", e);
+        }
+      }
+      setTimeout(() => { isInitialLoad.current = false; }, 500);
+    }).catch(console.error);
   }, []);
 
-  // Sync settings with backend and save to localStorage on change
+  // Save config to file on change
   useEffect(() => {
-    const settingsToSave = { useCustomPrompt, customEditPrompt, customAskPrompt };
-    localStorage.setItem("promptSettings", JSON.stringify(settingsToSave));
-    localStorage.setItem("aiderPath", aiderPath);
-    localStorage.setItem("gitPath", gitPath);
-    localStorage.setItem("apiPort", String(apiPort));
+    if (isInitialLoad.current) return;
 
+    const config: AppConfig = {
+      target_dir: targetDir,
+      file_encoding: fileEncoding,
+      map_tokens: mapTokens,
+      max_file_size_kb: maxFileSizeKb,
+      output_extension: outputExtension,
+      git_path: gitPath,
+      aider_path: aiderPath,
+      chat_language: chatLanguage,
+      api_port: String(apiPort),
+      prompt_settings: JSON.stringify({ useCustomPrompt, customEditPrompt, customAskPrompt }),
+    };
+    invoke("save_config", { config }).catch(console.error);
+  }, [targetDir, fileEncoding, mapTokens, maxFileSizeKb, outputExtension, gitPath, aiderPath, chatLanguage, apiPort, useCustomPrompt, customEditPrompt, customAskPrompt]);
+
+  // Sync settings that are still needed by Rust backend in memory
+  useEffect(() => {
     const settingsForRust = {
       use_custom: useCustomPrompt,
       custom_edit_prompt: customEditPrompt,
       custom_ask_prompt: customAskPrompt,
     };
-    invoke("update_prompt_settings", { settings: settingsForRust }).catch(
-      console.error
-    );
-  }, [useCustomPrompt, customEditPrompt, customAskPrompt, aiderPath, apiPort, gitPath]);
-
-  useEffect(() => {
+    invoke("update_prompt_settings", { settings: settingsForRust }).catch(console.error);
     invoke("start_api_server", { port: Number(apiPort) }).catch(console.error);
-  }, [apiPort]);
-
-  useEffect(() => {
-    localStorage.setItem("chatLanguage", chatLanguage);
-  }, [chatLanguage]);
-
-  useEffect(() => {
-    localStorage.setItem("fileEncoding", fileEncoding);
-  }, [fileEncoding]);
-
-  useEffect(() => {
-    localStorage.setItem("mapTokens", mapTokens);
-  }, [mapTokens]);
-
-  useEffect(() => {
-    localStorage.setItem("outputExtension", outputExtension);
-  }, [outputExtension]);
-
-  useEffect(() => {
-    localStorage.setItem("maxFileSizeKb", maxFileSizeKb);
-  }, [maxFileSizeKb]);
+  }, [useCustomPrompt, customEditPrompt, customAskPrompt, apiPort]);
 
   useEffect(() => {
     const unlisten = listen<RepoMapPayload>("repo_map_ready", (event) => {
@@ -369,6 +381,10 @@ function App() {
                 <div className="form-group">
                     <label>Output File Extension (e.g., xml, txt, md)</label>
                     <input type="text" value={outputExtension} onChange={(e) => setOutputExtension(e.target.value)} placeholder="xml" />
+                </div>
+                 <div className="form-group">
+                    <label>Config File</label>
+                    <button onClick={() => invoke("open_config_dir")}>Open Folder</button>
                 </div>
             </div>
 
