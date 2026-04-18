@@ -43,6 +43,7 @@ function App() {
   const [instruction, setInstruction] = useState("");
   const [fileEncoding, setFileEncoding] = useState(() => localStorage.getItem("fileEncoding") || "");
   const [mapTokens, setMapTokens] = useState(() => localStorage.getItem("mapTokens") || "");
+  const [outputExtension, setOutputExtension] = useState(() => localStorage.getItem("outputExtension") || "xml");
   const [gitPath, setGitPath] = useState(() => localStorage.getItem("gitPath") || "");
   const [chatLanguage, setChatLanguage] = useState(() => localStorage.getItem("chatLanguage") || "English");
   const [aiderPath, setAiderPath] = useState(() => localStorage.getItem("aiderPath") || "aider");
@@ -119,6 +120,10 @@ function App() {
   }, [mapTokens]);
 
   useEffect(() => {
+    localStorage.setItem("outputExtension", outputExtension);
+  }, [outputExtension]);
+
+  useEffect(() => {
     localStorage.setItem("maxFileSizeKb", maxFileSizeKb);
   }, [maxFileSizeKb]);
 
@@ -173,6 +178,7 @@ function App() {
         files,
         fileEncoding,
         maxFileSizeKb: Number(maxFileSizeKb) || 0,
+        outputExtension,
       });
       setPackedFilesPaths(paths);
       setLogs(prev => [...prev, `--- PromptProxy: Successfully packed into ${paths.length} file(s) ---`]);
@@ -204,9 +210,12 @@ function App() {
       fileEncoding,
       gitPath,
       mapTokens,
+      outputExtension,
       apiPort: Number(apiPort),
     });
   };
+
+  const displayExt = outputExtension.replace(/^\./, '') || 'xml';
 
   const handleDragFile = async (e: DragEvent<HTMLDivElement>, filePaths: string[], iconPath?: string) => {
     const isLinux = navigator.userAgent.toLowerCase().includes("linux");
@@ -357,6 +366,10 @@ function App() {
                     <label>Map Tokens (Optional. e.g., 1024)</label>
                     <input type="number" value={mapTokens} onChange={(e) => setMapTokens(e.target.value)} placeholder="Leave blank for Aider default" />
                 </div>
+                <div className="form-group">
+                    <label>Output File Extension (e.g., xml, txt, md)</label>
+                    <input type="text" value={outputExtension} onChange={(e) => setOutputExtension(e.target.value)} placeholder="xml" />
+                </div>
             </div>
 
             {/* Block A: Repo Map Generation */}
@@ -381,7 +394,7 @@ function App() {
                             <div className="draggable-file-wrapper">
                                 <div className="draggable-file" draggable={true} onDragStart={(e) => handleDragFile(e, [repoMapData.repo_map_file_path], repoMapData.icon_file_path)}>
                                     <svg width="64" height="80" viewBox="0 0 100 120"><path d="M0 4C0 1.8 1.8 0 4 0H65L100 35V116C100 118.2 98.2 120 96 120H4C1.8 120 0 118.2 0 116V4Z" fill="#CF84E1"/><path d="M65 0V31C65 33.2 66.8 35 69 35H100L65 0Z" fill="#B463C8"/><text x="50" y="78" fill="white" fontSize="36" fontFamily="monospace" textAnchor="middle" fontWeight="bold">&lt;/&gt;</text></svg>
-                                    <span className="file-name">repo_map.xml</span>
+                                    <span className="file-name">repo_map.{displayExt}</span>
                                 </div>
                             </div>
                         </div>
@@ -420,7 +433,7 @@ function App() {
                           {packedFilesPaths.map((path, index) => (
                               <div key={index} className="draggable-file" draggable={true} onDragStart={(e) => handleDragFile(e, [path], repoMapData.icon_file_path!)}>
                                   <svg width="64" height="80" viewBox="0 0 100 120"><path d="M0 4C0 1.8 1.8 0 4 0H65L100 35V116C100 118.2 98.2 120 96 120H4C1.8 120 0 118.2 0 116V4Z" fill="#84A1E1"/><path d="M65 0V31C65 33.2 66.8 35 69 35H100L65 0Z" fill="#637BC8"/><text x="50" y="78" fill="white" fontSize="36" fontFamily="monospace" textAnchor="middle" fontWeight="bold">&lt;/&gt;</text></svg>
-                                  <span className="file-name">target_files_{index + 1}.xml</span>
+                                  <span className="file-name">target_files_{index + 1}.{displayExt}</span>
                               </div>
                           ))}
                       </div>

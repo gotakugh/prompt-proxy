@@ -16,6 +16,7 @@ pub struct AiderSession {
     pub file_encoding: String,
     pub git_path: String,
     pub map_tokens: String,
+    pub output_extension: String,
     pub api_port: u16,
 }
 pub struct AiderSessionState(pub Mutex<Option<AiderSession>>);
@@ -36,6 +37,7 @@ fn launch_aider_batch(
     file_encoding: String,
     git_path: String,
     map_tokens: String,
+    output_extension: String,
     api_port: u16,
     app_handle: tauri::AppHandle,
     session_state: tauri::State<'_, AiderSessionState>,
@@ -50,6 +52,7 @@ fn launch_aider_batch(
         file_encoding: file_encoding.clone(),
         git_path: git_path.clone(),
         map_tokens: map_tokens.clone(),
+        output_extension: output_extension.clone(),
         api_port,
     };
     *session_state.0.lock().unwrap() = Some(session);
