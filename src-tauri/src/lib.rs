@@ -203,22 +203,38 @@ async fn apply_patch(
     let mut processed_response = response.clone();
     let mut target_file_path = None;
     let lines: Vec<&str> = response.lines().collect();
+    
     for (i, line) in lines.iter().enumerate() {
-        if line.contains("<<<<<<< SEARCH") && i > 0 {
-            target_file_path = Some(lines[i - 1].trim());
+        if line.contains("<<<<<<< SEARCH") {
+            // SEARCH行から上に向かって、空行やマークダウン開始記号(```)ではない行を探す
+            for j in (0..i).rev() {
+                let prev_line = lines[j].trim();
+                if !prev_line.is_empty() && !prev_line.starts_with("```") {
+                    // バッククォートやアスタリスク等の装飾を剥がす
+                    let clean_path = prev_line.trim_matches(|c| c == '`' || c == '*' || c == '"' || c == '\'');
+                    target_file_path = Some(clean_path);
+                    break;
+                }
+            }
             break;
         }
     }
 
+    // デフォルトはOSの仕様に従う（WindowsならCRLF、Mac/LinuxならLF）
     let mut use_crlf = cfg!(windows);
+    
     if let Some(rel_path) = target_file_path {
         let full_path = std::path::Path::new(&target_dir).join(rel_path);
+        
+        // ファイルが存在すれば実際の改行コードを優先して上書き
         if let Ok(bytes) = std::fs::read(&full_path) {
             if bytes.windows(2).any(|w| w == b"\r\n") {
                 use_crlf = true;
             } else if bytes.contains(&b'\n') {
-                use_crlf = false;
+                use_crlf = false; // Unix改行コード(LF)を検出！
             }
+        } else {
+            let _ = app_handle.emit("aider_log", format!("=> [PromptProxy] Note: Could not read target file for line-ending detection. Defaulting to OS standard. Path: {:?}", full_path));
         }
     }
 
