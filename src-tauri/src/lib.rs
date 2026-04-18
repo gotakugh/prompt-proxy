@@ -77,7 +77,7 @@ pub fn resolve_encoding_labels(input: &str) -> (String, String) {
     }
 }
 
-pub fn spawn_aider_process(app_handle: &tauri::AppHandle, target_dir: String, files: String, message: String, chat_language: String, aider_path: String, file_encoding: String, api_port: u16, git_path: String, map_tokens: String) {
+pub fn spawn_aider_process(app_handle: &tauri::AppHandle, target_dir: String, _files: String, message: String, chat_language: String, aider_path: String, file_encoding: String, api_port: u16, git_path: String, map_tokens: String) {
     let mut path_parts = aider_path.trim().split_whitespace();
     let program = path_parts.next().unwrap_or("aider");
     let mut command = Command::new(program);

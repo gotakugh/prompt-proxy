@@ -57,7 +57,7 @@ async fn chat_completions_handler(
     Json(payload): Json<Value>,
 ) -> impl IntoResponse {
     println!("=> [PromptProxy] Request received");
-    let request_id = Uuid::new_v4().to_string();
+    let _request_id = Uuid::new_v4().to_string();
 
     // 1. Parse OpenAI JSON
     let messages = match payload.get("messages").and_then(|m| m.as_array()) {
@@ -67,7 +67,7 @@ async fn chat_completions_handler(
 
     // --- NEW: UIで指定されたターゲットファイルとエンコーディングをStateから取得 ---
     let session_state: tauri::State<crate::AiderSessionState> = app_handle.state();
-    let (target_dir, target_files, file_enc_str, output_ext_str) = {
+    let (_target_dir, _target_files, _file_enc_str, output_ext_str) = {
         let lock = session_state.0.lock().unwrap();
         if let Some(session) = &*lock {
             (session.target_dir.clone(), session.files.clone(), session.file_encoding.clone(), session.output_extension.clone())
@@ -271,7 +271,7 @@ pub async fn pack_target_files(
     let ext_clean = output_extension.trim().trim_start_matches('.');
     let ext_clean = if ext_clean.is_empty() { "xml" } else { ext_clean };
     
-    let mut flush_chunk = |chunk: &mut String, index: &mut usize, paths: &mut Vec<String>| -> Result<(), String> {
+    let flush_chunk = |chunk: &mut String, index: &mut usize, paths: &mut Vec<String>| -> Result<(), String> {
         if chunk.len() > header.len() {
             let temp_dir = std::env::temp_dir();
             let temp_path = temp_dir.join(format!("target_files_{}.{}", index, ext_clean));
@@ -293,19 +293,18 @@ pub async fn pack_target_files(
         match std::fs::read(&file_path) {
             Ok(bytes) => {
                 let _ = app_handle.emit("aider_log", format!("=> [PromptProxy] Read file: {} ({} bytes)", abs_path.display(), bytes.len()));
-                let mut decoded_content = String::new();
                 let enc_trim = file_encoding.trim();
-                if !enc_trim.is_empty() {
+                let decoded_content = if !enc_trim.is_empty() {
                     let (rust_enc, _) = crate::resolve_encoding_labels(enc_trim);
                     if let Some(encoding) = encoding_rs::Encoding::for_label(rust_enc.as_bytes()) {
                         let (cow, _, _) = encoding.decode(&bytes);
-                        decoded_content = cow.into_owned();
+                        cow.into_owned()
                     } else {
-                        decoded_content = String::from_utf8_lossy(&bytes).into_owned();
+                        String::from_utf8_lossy(&bytes).into_owned()
                     }
                 } else {
-                    decoded_content = String::from_utf8_lossy(&bytes).into_owned();
-                }
+                    String::from_utf8_lossy(&bytes).into_owned()
+                };
 
                 let mut current_file_content = String::new();
                 let mut start_line = 1;
@@ -415,7 +414,6 @@ pub async fn start_api_server(
 }
 
 use serde::{Deserialize, Serialize};
-use std::fs;
 use std::path::PathBuf;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
