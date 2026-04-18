@@ -103,6 +103,8 @@ pub fn spawn_aider_process(app_handle: &tauri::AppHandle, target_dir: String, fi
         "dummy",
         "--model",
         "gpt-4o",
+        "--edit-format", // NEW: Aiderのデフォルトフォーマットルールを無効化
+        "ask",           // NEW: ルールを含まないプレーンなプロンプトを生成させる
         "--no-stream",
         "--no-auto-commits",
         "--yes",

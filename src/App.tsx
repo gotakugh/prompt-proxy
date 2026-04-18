@@ -7,11 +7,26 @@ import "./App.css";
 
 const DEFAULT_EDIT_PROMPT = "Read the attached context.xml, understand the context, and modify the code according to the instructions below.\n\n" +
   "=== Instructions ===\n{instruction}\n================\n\n" +
-  "[IMPORTANT] Strict Output Format:\n" +
+  "🚨 [CRITICAL FORMATTING RULES] 🚨\n" +
   "1. Omit all greetings and explanations.\n" +
-  "2. Output ALL your modifications within a SINGLE markdown code block. Do NOT split them into multiple blocks, even if you are modifying multiple files or multiple locations.\n" +
-  "3. Inside the code block, each modification must strictly follow the Aider SEARCH/REPLACE format. You MUST write the exact 'target file path' on a single line immediately before each <<<<<<< SEARCH marker.\n" +
-  "4. ONLY if you determine that necessary files are missing from context.xml, DO NOT output the code modification block. Instead, politely tell the user which files are missing, output the missing file paths in a single markdown code block (so the user can easily copy them), and ask the user to add them to the 'Target Files' input and try again.";
+  "2. Output ALL your modifications within a SINGLE markdown code block (` ```text ` or ` ``` `). Do NOT split them into multiple blocks, even if modifying multiple files.\n" +
+  "3. Inside the code block, you MUST write the 'target file path' on a single line immediately before its `<<<<<<< SEARCH` marker.\n\n" +
+  "Example Output Format:\n" +
+  "```text\n" +
+  "src/main.rs\n" +
+  "<<<<<<< SEARCH\n" +
+  "// old code in main\n" +
+  "=======\n" +
+  "// new code in main\n" +
+  ">>>>>>> REPLACE\n\n" +
+  "src/utils.rs\n" +
+  "<<<<<<< SEARCH\n" +
+  "// old code in utils\n" +
+  "=======\n" +
+  "// new code in utils\n" +
+  ">>>>>>> REPLACE\n" +
+  "```\n\n" +
+  "4. ONLY if you determine that necessary files are missing from context.xml, DO NOT output the code modification block. Instead, output the missing file paths in a single code block and ask the user to add them.";
 
 const DEFAULT_ASK_PROMPT = "Read the attached context.xml, understand the repository context, and answer the following question.\n\n=== Question ===\n{instruction}\n==============\n\n[IMPORTANT]\nIf you determine that necessary files are missing from context.xml to answer the question, please tell the user which files are missing. Output the missing file paths in a single markdown code block (so the user can easily copy them), and ask the user to add them to the 'Target Files' input and run again.";
 
