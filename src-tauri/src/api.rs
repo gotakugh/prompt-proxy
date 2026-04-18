@@ -129,7 +129,9 @@ async fn chat_completions_handler(
             .into_response();
     }
 
-    let temp_path = temp_dir.join("repo_map.xml");
+    let ext = output_ext_str.trim().trim_start_matches('.');
+    let ext = if ext.is_empty() { "xml" } else { ext };
+    let temp_path = temp_dir.join(format!("repo_map.{}", ext));
 
     if let Err(e) = fs::write(&temp_path, &xml_string) {
         return Json(json!({ "error": format!("Failed to write repo_map.xml: {}", e)}))
