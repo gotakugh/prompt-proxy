@@ -97,7 +97,6 @@ pub fn spawn_aider_process(app_handle: &tauri::AppHandle, target_dir: String, _f
     command.env("PATH", path_env);
     
     command.env("PYTHONUTF8", "1");
-    command.env("AIDER_CHECK_UPDATE", "false");
 
     command.args([
         "--openai-api-base",
@@ -112,6 +111,8 @@ pub fn spawn_aider_process(app_handle: &tauri::AppHandle, target_dir: String, _f
         "--no-auto-commits",
         "--yes",
         "--no-analytics",
+        "--no-show-release-notes",
+        "--no-check-update",
     ]);
 
     if !map_tokens.trim().is_empty() {
@@ -292,7 +293,6 @@ async fn apply_patch(
     }
     command.env("PATH", path_env);
     command.env("PYTHONUTF8", "1");
-    command.env("AIDER_CHECK_UPDATE", "false"); // アップデートチェックの無効化
 
     // AiderSessionStateから、PromptProxyが待ち受けているローカルポートを取得
     let api_port = {
@@ -315,6 +315,8 @@ async fn apply_patch(
     command.arg("--yes");
     command.arg("--no-analytics");
     command.arg("--no-auto-commits"); // 追加: パッチ適用後の自動コミットとAPI通信を遮断
+    command.arg("--no-show-release-notes");
+    command.arg("--no-check-update");
 
     if !python_enc.is_empty() {
         command.arg("--encoding").arg(python_enc);
