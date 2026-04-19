@@ -565,3 +565,8 @@ button {
     background-color: rgba(255, 255, 255, 0.05);
   }
 }
+
+.header-actions {
+  display: flex;
+  gap: 1em;
+}
