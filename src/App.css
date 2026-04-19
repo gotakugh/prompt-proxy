@@ -195,6 +195,7 @@ button {
   display: flex;
   flex-direction: column;
 }
+/* --- Terminal / Log Area Styles --- */
 .bottom-terminal {
   flex-shrink: 0;
   height: 35%;
@@ -203,7 +204,62 @@ button {
   border-top: 2px solid #333;
   display: flex;
   flex-direction: column;
-  padding: 1em;
+}
+
+.terminal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background-color: #2d2d2d;
+  padding: 0.4em 1em;
+  border-bottom: 1px solid #000;
+  color: #aaa;
+  font-family: Consolas, "Courier New", monospace;
+  font-size: 0.85em;
+}
+
+.terminal-title {
+  font-weight: bold;
+  letter-spacing: 0.5px;
+}
+
+.terminal-title::before {
+  content: ">_ ";
+  color: #4CAF50;
+}
+
+.clear-logs-button {
+  background-color: transparent;
+  border: 1px solid #555;
+  color: #aaa;
+  padding: 0.2em 0.8em;
+  font-size: 0.9em;
+  border-radius: 4px;
+  box-shadow: none;
+}
+
+.clear-logs-button:hover {
+  background-color: #444;
+  color: #fff;
+  border-color: #888;
+}
+
+.terminal-log {
+  flex: 1;
+  color: #d4d4d4;
+  font-family: Consolas, "Courier New", monospace;
+  line-height: 1.5;
+  overflow-y: auto;
+  text-align: left;
+  white-space: pre-wrap;
+  font-size: 0.9em;
+  padding: 0.8em 1em;
+  margin-bottom: 0;
+}
+
+.terminal-placeholder {
+  color: #666;
+  font-style: italic;
 }
 
 .card {
@@ -365,17 +421,6 @@ button {
 }
 
 
-.terminal-log {
-  flex: 1;
-  color: #d4d4d4;
-  font-family: Consolas, "Courier New", monospace;
-  line-height: 1.5;
-  overflow-y: auto;
-  text-align: left;
-  white-space: pre-wrap;
-  font-size: 0.9em;
-  margin-bottom: 1em;
-}
 
 .draggable-file-wrapper {
   text-align: left; /* 中央揃えをやめて左詰めにする */

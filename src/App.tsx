@@ -485,7 +485,14 @@ function App() {
       </main>
 
       <footer className="bottom-terminal">
+        <div className="terminal-header">
+          <span className="terminal-title">System Logs</span>
+          <button className="clear-logs-button" onClick={() => setLogs([])}>Clear</button>
+        </div>
         <div className="terminal-log">
+          {logs.length === 0 && (
+            <div className="terminal-placeholder">Ready. Waiting for operations...</div>
+          )}
           {logs.map((log, index) => (
             <div key={index}>{log}</div>
           ))}
