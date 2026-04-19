@@ -436,6 +436,58 @@ button {
   flex: 1;
 }
 
+.project-settings-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1em;
+  padding-bottom: 0.5em !important;
+}
+.project-settings-container h3 {
+  width: 100%;
+}
+.project-settings-container .form-group {
+  flex: 1 1 calc(33.33% - 1em);
+  min-width: 200px;
+  margin-bottom: 0.5em;
+}
+.project-settings-container .form-group label {
+  white-space: nowrap;
+}
+
+.tabs-container {
+  display: flex;
+  flex-direction: column;
+  margin-top: 1em;
+}
+
+.tabs {
+  display: flex;
+  border-bottom: 1px solid #ddd;
+}
+
+.tab-button {
+  padding: 0.8em 1.2em;
+  border: none;
+  background-color: transparent;
+  cursor: pointer;
+  border-radius: 6px 6px 0 0;
+  box-shadow: none;
+  border-bottom: 3px solid transparent;
+  margin-bottom: -1px; /* To overlap with container border */
+  font-size: 1em;
+  color: #555;
+}
+
+.tab-button.active {
+  border-bottom: 3px solid #396cd8;
+  color: #0f0f0f;
+  background-color: rgba(0,0,0,0.03);
+}
+
+.tab-content > .card {
+  border-top-left-radius: 0;
+}
+
 @media (prefers-color-scheme: dark) {
   .card {
     background-color: rgba(255, 255, 255, 0.05);
