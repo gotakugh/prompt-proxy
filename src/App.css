@@ -84,13 +84,9 @@ h1 {
 }
 
 .settings-button {
-  font-size: 1.5rem;
-  padding: 0.2rem 0.4rem;
   background: transparent;
-  border: 1px solid transparent;
-  box-shadow: none;
-  border-radius: 6px;
-  line-height: 1;
+  border: 1px solid #ccc;
+  color: #555;
 }
 
 .settings-button:hover {
@@ -294,7 +290,8 @@ button {
 }
 
 .settings-container {
-  background-color: rgba(0, 0, 0, 0.03);
+  background-color: #ffffff;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.2);
   border-radius: 8px;
   padding: 2em;
   max-width: 800px;
@@ -410,7 +407,7 @@ button {
 .response-box textarea {
   box-sizing: border-box;
   width: 100%;
-  height: 120px; /* 初期高さを少し抑える */
+  min-height: 250px;
   padding: 0.5em;
   margin-bottom: 1em;
   border-radius: 8px;
@@ -544,7 +541,8 @@ button {
   }
 
   .settings-container {
-    background-color: rgba(255, 255, 255, 0.05);
+    background-color: #2a2a2a;
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.5);
   }
 
   .prompt-hint {

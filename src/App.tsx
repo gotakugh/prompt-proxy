@@ -308,74 +308,74 @@ function App() {
       <header className="status-header">
         <h2 style={{ margin: 0, fontSize: '1.2em' }}>LLM Prompt Proxy</h2>
         <div className="header-actions">
-          <button onClick={handleReset} className="abort-button">⏹ 中止 (Abort)</button>
-          <button className="settings-button" onClick={handleOpenSettings}>⚙️ アプリ設定</button>
+          <button onClick={handleReset} className="abort-button">⏹ Abort</button>
+          <button className="settings-button" onClick={handleOpenSettings}>⚙️ Settings</button>
         </div>
       </header>
 
       {showSettings && (
         <div className="modal-overlay" onClick={handleCancelSettings}>
           <div className="settings-container" onClick={(e) => e.stopPropagation()}>
-            <h2>アプリ設定 (App Settings)</h2>
+            <h2>App Settings</h2>
             <div className="settings-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1em' }}>
               <div className="form-group">
-                <label>Aiderコマンドライン</label>
+                <label>Aider Path</label>
                 <input type="text" value={tempAiderPath} onChange={(e) => setTempAiderPath(e.target.value)} />
               </div>
               <div className="form-group">
-                <label>Aider接続ポート</label>
+                <label>API Port</label>
                 <input type="number" value={tempApiPort} onChange={(e) => setTempApiPort(Number(e.target.value))} />
               </div>
               <div className="form-group">
-                <label>チャット言語</label>
+                <label>Chat Language</label>
                 <input type="text" value={tempChatLanguage} onChange={(e) => setTempChatLanguage(e.target.value)} />
               </div>
               <div className="form-group">
-                <label>RepoMap最大トークン数</label>
+                <label>RepoMap Max Tokens</label>
                 <input type="number" value={tempMapTokens} onChange={(e) => setTempMapTokens(e.target.value)} />
               </div>
               <div className="form-group">
-                <label>出力ファイルサイズ (KB)</label>
+                <label>Max Split Size (KB)</label>
                 <input type="number" value={tempMaxFileSizeKb} onChange={(e) => setTempMaxFileSizeKb(e.target.value)} />
               </div>
               <div className="form-group">
-                <label>出力ファイル拡張子</label>
+                <label>Output File Extension</label>
                 <input type="text" value={tempOutputExtension} onChange={(e) => setTempOutputExtension(e.target.value)} />
               </div>
               <div className="form-group">
-                <label>Gitパス (任意)</label>
+                <label>Git Path (Optional)</label>
                 <input type="text" value={tempGitPath} onChange={(e) => setTempGitPath(e.target.value)} />
               </div>
             </div>
 
             <div className="form-group" style={{ marginTop: '1.5em' }}>
-              <label>プロンプト設定</label>
+              <label>Prompt Settings</label>
               <div className="mode-selector">
-                <label><input type="radio" checked={!tempUseCustomPrompt} onChange={() => setTempUseCustomPrompt(false)}/> デフォルト</label>
-                <label><input type="radio" checked={tempUseCustomPrompt} onChange={() => setTempUseCustomPrompt(true)}/> カスタム</label>
+                <label><input type="radio" checked={!tempUseCustomPrompt} onChange={() => setTempUseCustomPrompt(false)}/> Default</label>
+                <label><input type="radio" checked={tempUseCustomPrompt} onChange={() => setTempUseCustomPrompt(true)}/> Custom</label>
               </div>
             </div>
 
             {tempUseCustomPrompt && (
               <>
                 <div className="form-group">
-                  <label>Editモード用プロンプト</label>
+                  <label>Edit Mode Prompt</label>
                   <textarea value={tempCustomEditPrompt} onChange={(e) => setTempCustomEditPrompt(e.target.value)}/>
                 </div>
                 <div className="form-group">
-                  <label>Askモード用プロンプト</label>
+                  <label>Ask Mode Prompt</label>
                   <textarea value={tempCustomAskPrompt} onChange={(e) => setTempCustomAskPrompt(e.target.value)}/>
                 </div>
               </>
             )}
 
             <div className="button-group" style={{ marginTop: '2em', display: 'flex', gap: '1em' }}>
-              <button onClick={handleSaveSettings} style={{ flex: 1, backgroundColor: '#396cd8', color: 'white' }}>保存 (Save)</button>
-              <button onClick={handleCancelSettings} style={{ flex: 1 }}>キャンセル (Cancel)</button>
+              <button onClick={handleSaveSettings} style={{ flex: 1, backgroundColor: '#396cd8', color: 'white' }}>Save</button>
+              <button onClick={handleCancelSettings} style={{ flex: 1 }}>Cancel</button>
             </div>
             <div className="button-group" style={{ marginTop: '1em', display: 'flex', gap: '1em' }}>
-              <button onClick={() => invoke("open_config_dir")} style={{ flex: 1 }}>設定フォルダを開く</button>
-              <button onClick={() => { setTempCustomEditPrompt(DEFAULT_EDIT_PROMPT); setTempCustomAskPrompt(DEFAULT_ASK_PROMPT); }} style={{ flex: 1 }}>プロンプト初期化</button>
+              <button onClick={() => invoke("open_config_dir")} style={{ flex: 1 }}>Open Config Folder</button>
+              <button onClick={() => { setTempCustomEditPrompt(DEFAULT_EDIT_PROMPT); setTempCustomAskPrompt(DEFAULT_ASK_PROMPT); }} style={{ flex: 1 }}>Reset Prompts</button>
             </div>
           </div>
         </div>
@@ -384,23 +384,23 @@ function App() {
       <main className="main-content">
         <div className="card project-settings-container" style={{ display: 'flex', gap: '1em', marginBottom: '1em', paddingBottom: '0.5em' }}>
             <div className="form-group" style={{ flex: 2 }}>
-                <label>プロジェクトパス (Target Directory)</label>
+                <label>Target Directory</label>
                 <div className="input-group">
                     <input type="text" value={targetDir} onChange={(e) => setTargetDir(e.target.value)} placeholder="/path/to/your/project" />
                     <button onClick={handleSelectDirectory}>Select</button>
                 </div>
             </div>
             <div className="form-group" style={{ flex: 1 }}>
-                <label>文字エンコーディング</label>
+                <label>File Encoding</label>
                 <input type="text" value={fileEncoding} onChange={(e) => setFileEncoding(e.target.value)} placeholder="utf-8" />
             </div>
         </div>
         
         <div className="tabs-container">
           <div className="tabs">
-            <button className={`tab-button ${activeTab === 'A' ? 'active' : ''}`} onClick={() => setActiveTab('A')}>RepoMap / プロンプト</button>
-            <button className={`tab-button ${activeTab === 'B' ? 'active' : ''}`} onClick={() => setActiveTab('B')}>追加ファイル</button>
-            <button className={`tab-button ${activeTab === 'C' ? 'active' : ''}`} onClick={() => setActiveTab('C')}>パッチ適用</button>
+            <button className={`tab-button ${activeTab === 'A' ? 'active' : ''}`} onClick={() => setActiveTab('A')}>RepoMap / Prompt</button>
+            <button className={`tab-button ${activeTab === 'B' ? 'active' : ''}`} onClick={() => setActiveTab('B')}>Add Files</button>
+            <button className={`tab-button ${activeTab === 'C' ? 'active' : ''}`} onClick={() => setActiveTab('C')}>Apply Patch</button>
           </div>
           
           <div className="tab-content">
@@ -472,7 +472,7 @@ function App() {
             
             {activeTab === 'C' && (
               <div className="card">
-                  <div className="response-content">
+                  <div className="response-box">
                       <textarea value={aiResponse} onChange={(e) => setAiResponse(e.target.value)} placeholder="Paste AI response with SEARCH/REPLACE blocks here..."/>
                       <div className="button-group" style={{ marginTop: '1em' }}>
                           <button onClick={handleApplyPatch}>Apply Patch</button>
