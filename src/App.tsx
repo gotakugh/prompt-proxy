@@ -50,6 +50,7 @@ interface AppConfig {
 }
 
 function App() {
+  const [activeTab, setActiveTab] = useState("A");
   const [mode, setMode] = useState<"edit" | "ask">("edit");
   const [targetDir, setTargetDir] = useState("");
   const [files, setFiles] = useState("");
@@ -73,6 +74,15 @@ function App() {
   const [useCustomPrompt, setUseCustomPrompt] = useState(false);
   const [customEditPrompt, setCustomEditPrompt] = useState(DEFAULT_EDIT_PROMPT);
   const [customAskPrompt, setCustomAskPrompt] = useState(DEFAULT_ASK_PROMPT);
+
+  // Temporary states for settings modal
+  const [tempAiderPath, setTempAiderPath] = useState("aider");
+  const [tempApiPort, setTempApiPort] = useState(8080);
+  const [tempGitPath, setTempGitPath] = useState("");
+  const [tempChatLanguage, setTempChatLanguage] = useState("English");
+  const [tempUseCustomPrompt, setTempUseCustomPrompt] = useState(false);
+  const [tempCustomEditPrompt, setTempCustomEditPrompt] = useState(DEFAULT_EDIT_PROMPT);
+  const [tempCustomAskPrompt, setTempCustomAskPrompt] = useState(DEFAULT_ASK_PROMPT);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -154,6 +164,32 @@ function App() {
       unlistenAiderLog.then((fn) => fn());
     };
   }, []);
+
+  const handleOpenSettings = () => {
+    setTempAiderPath(aiderPath);
+    setTempApiPort(apiPort);
+    setTempGitPath(gitPath);
+    setTempChatLanguage(chatLanguage);
+    setTempUseCustomPrompt(useCustomPrompt);
+    setTempCustomEditPrompt(customEditPrompt);
+    setTempCustomAskPrompt(customAskPrompt);
+    setShowSettings(true);
+  };
+
+  const handleSaveSettings = () => {
+    setAiderPath(tempAiderPath);
+    setApiPort(tempApiPort);
+    setGitPath(tempGitPath);
+    setChatLanguage(tempChatLanguage);
+    setUseCustomPrompt(tempUseCustomPrompt);
+    setCustomEditPrompt(tempCustomEditPrompt);
+    setCustomAskPrompt(tempCustomAskPrompt);
+    setShowSettings(false);
+  };
+
+  const handleCancelSettings = () => {
+    setShowSettings(false);
+  };
 
   const handleCopyToClipboard = () => {
     if (repoMapData?.prompt) {
@@ -266,209 +302,176 @@ function App() {
         </div>
         <button onClick={handleReset} className="reset-button">🔄 Reload</button>
       </header>
-      <main className="main-content">
-        <div className="main-header">
-          <h1>LLM Prompt Proxy</h1>
-          <button className="settings-button" onClick={() => setShowSettings(true)}>⚙️ Settings</button>
-        </div>
 
-        {showSettings ? (
-          <div className="settings-container">
-            <h2>Prompt Settings</h2>
+      {showSettings && (
+        <div className="modal-overlay" onClick={handleCancelSettings}>
+          <div className="settings-container" onClick={(e) => e.stopPropagation()}>
+            <h2>Application Settings</h2>
             <div className="form-group">
               <label>Aider Path (Executable Path)</label>
-              <input
-                type="text"
-                value={aiderPath}
-                onChange={(e) => setAiderPath(e.target.value)}
-                placeholder="aider"
-              />
+              <input type="text" value={tempAiderPath} onChange={(e) => setTempAiderPath(e.target.value)} placeholder="aider"/>
             </div>
             <div className="form-group">
               <label>API Port (Proxy Server Port)</label>
-              <input
-                type="number"
-                value={apiPort}
-                onChange={(e) => setApiPort(Number(e.target.value))}
-              />
+              <input type="number" value={tempApiPort} onChange={(e) => setTempApiPort(Number(e.target.value))}/>
             </div>
             <div className="form-group">
               <label>Git Path (Optional. e.g. C:\Program Files\Git\cmd)</label>
-              <input type="text" value={gitPath} onChange={(e) => setGitPath(e.target.value)} placeholder="Leave blank if git is in PATH" />
+              <input type="text" value={tempGitPath} onChange={(e) => setTempGitPath(e.target.value)} placeholder="Leave blank if git is in PATH" />
             </div>
             <div className="form-group">
               <label>Chat Language (Aider's thinking/response language)</label>
-              <input
-                type="text"
-                value={chatLanguage}
-                onChange={(e) => setChatLanguage(e.target.value)}
-                placeholder="e.g. English, Japanese (Leave blank for OS default)"
-              />
+              <input type="text" value={tempChatLanguage} onChange={(e) => setTempChatLanguage(e.target.value)} placeholder="e.g. English, Japanese"/>
             </div>
             <div className="form-group">
               <div className="mode-selector">
-                <label>
-                  <input
-                    type="radio"
-                    checked={!useCustomPrompt}
-                    onChange={() => setUseCustomPrompt(false)}
-                  />
-                  Use tool's default settings
-                </label>
-                <label>
-                  <input
-                    type="radio"
-                    checked={useCustomPrompt}
-                    onChange={() => setUseCustomPrompt(true)}
-                  />
-                  Use custom prompts
-                </label>
+                <label><input type="radio" checked={!tempUseCustomPrompt} onChange={() => setTempUseCustomPrompt(false)}/> Use default prompts</label>
+                <label><input type="radio" checked={tempUseCustomPrompt} onChange={() => setTempUseCustomPrompt(true)}/> Use custom prompts</label>
               </div>
             </div>
-
-            {useCustomPrompt && (
+            {tempUseCustomPrompt && (
               <>
                 <div className="form-group">
                   <label>Prompt for Code Edit (Edit)</label>
-                  <textarea
-                    value={customEditPrompt}
-                    onChange={(e) => setCustomEditPrompt(e.target.value)}
-                  />
+                  <textarea value={tempCustomEditPrompt} onChange={(e) => setTempCustomEditPrompt(e.target.value)}/>
                   <p className="prompt-hint">* User instruction will be inserted at {`{instruction}`}</p>
                 </div>
                 <div className="form-group">
                   <label>Prompt for Repository Q&A (Ask)</label>
-                  <textarea
-                    value={customAskPrompt}
-                    onChange={(e) => setCustomAskPrompt(e.target.value)}
-                  />
+                  <textarea value={tempCustomAskPrompt} onChange={(e) => setTempCustomAskPrompt(e.target.value)}/>
                   <p className="prompt-hint">* User instruction will be inserted at {`{instruction}`}</p>
                 </div>
               </>
             )}
             <div className="button-group" style={{ marginTop: '1em' }}>
-              <button onClick={() => {
-                setCustomEditPrompt(DEFAULT_EDIT_PROMPT);
-                setCustomAskPrompt(DEFAULT_ASK_PROMPT);
-              }}>Reset to Defaults</button>
-              <button onClick={() => setShowSettings(false)}>Close Settings</button>
+              <button onClick={() => { setTempCustomEditPrompt(DEFAULT_EDIT_PROMPT); setTempCustomAskPrompt(DEFAULT_ASK_PROMPT); }}>Reset Prompts</button>
+              <button onClick={handleCancelSettings}>Cancel</button>
+              <button onClick={handleSaveSettings}>Save and Close</button>
             </div>
           </div>
-        ) : (
-          <div className="tool-container">
-            {/* Global Settings */}
-            <div className="card">
-                <h3>Global Settings</h3>
-                <div className="form-group">
-                    <label>Target Project Directory</label>
-                    <div className="input-group">
-                        <input type="text" value={targetDir} onChange={(e) => setTargetDir(e.target.value)} placeholder="/path/to/your/project" />
-                        <button onClick={handleSelectDirectory}>Select Folder</button>
-                    </div>
-                </div>
-                <div className="form-group">
-                    <label>File Encoding (e.g., cp932)</label>
-                    <input type="text" value={fileEncoding} onChange={(e) => setFileEncoding(e.target.value)} placeholder="Leave blank for default" />
-                </div>
-                <div className="form-group">
-                    <label>Max Split Size (KB) for Target Files (0 for unlimited)</label>
-                    <input type="number" value={maxFileSizeKb} onChange={(e) => setMaxFileSizeKb(e.target.value)} />
-                </div>
-                <div className="form-group">
-                    <label>Map Tokens (Optional. e.g., 1024)</label>
-                    <input type="number" value={mapTokens} onChange={(e) => setMapTokens(e.target.value)} placeholder="Leave blank for Aider default" />
-                </div>
-                <div className="form-group">
-                    <label>Output File Extension (e.g., xml, txt, md)</label>
-                    <input type="text" value={outputExtension} onChange={(e) => setOutputExtension(e.target.value)} placeholder="xml" />
-                </div>
-                 <div className="form-group">
-                    <label>Config File</label>
-                    <button onClick={() => invoke("open_config_dir")}>Open Folder</button>
+        </div>
+      )}
+
+      <main className="main-content">
+        <div className="main-header">
+          <h1>LLM Prompt Proxy</h1>
+          <button className="settings-button" onClick={handleOpenSettings}>⚙️ Settings</button>
+        </div>
+
+        <div className="card project-settings-container">
+            <h3>Project Settings</h3>
+            <div className="form-group">
+                <label>Target Project Directory</label>
+                <div className="input-group">
+                    <input type="text" value={targetDir} onChange={(e) => setTargetDir(e.target.value)} placeholder="/path/to/your/project" />
+                    <button onClick={handleSelectDirectory}>Select</button>
                 </div>
             </div>
-
-            {/* Block A: Repo Map Generation */}
-            <div className="card">
-                <h3>A. Generate Repo Map & Prompt</h3>
-                <div className="form-group">
-                    <label>Operation Mode</label>
-                    <div className="mode-selector">
-                        <label><input type="radio" value="edit" checked={mode === 'edit'} onChange={() => setMode('edit')}/> Edit Code</label>
-                        <label><input type="radio" value="ask" checked={mode === 'ask'} onChange={() => setMode('ask')}/> Ask about Repo</label>
-                    </div>
-                </div>
-                <div className="form-group">
-                    <label>Instructions for LLM</label>
-                    <textarea value={instruction} onChange={(e) => setInstruction(e.target.value)} placeholder="Fix the bug in..."/>
-                </div>
-                <button onClick={handleLaunchAider}>Generate Repo Map & Prompt</button>
-                {repoMapData && (
-                    <div className="prompt-content">
-                        <div className="info-box">
-                            <h4>RepoMap File</h4>
-                            <div className="draggable-file-wrapper">
-                                <div className="draggable-file" draggable={true} onDragStart={(e) => handleDragFile(e, [repoMapData.repo_map_file_path], repoMapData.icon_file_path)}>
-                                    <svg width="64" height="80" viewBox="0 0 100 120"><path d="M0 4C0 1.8 1.8 0 4 0H65L100 35V116C100 118.2 98.2 120 96 120H4C1.8 120 0 118.2 0 116V4Z" fill="#CF84E1"/><path d="M65 0V31C65 33.2 66.8 35 69 35H100L65 0Z" fill="#B463C8"/><text x="50" y="78" fill="white" fontSize="36" fontFamily="monospace" textAnchor="middle" fontWeight="bold">&lt;/&gt;</text></svg>
-                                    <span className="file-name">repo_map.{displayExt}</span>
-                                </div>
-                            </div>
-                        </div>
-                        <div className="info-box">
-                            <h4>Prompt</h4>
-                            <div className="prompt-display">
-                                <pre>{repoMapData.prompt}</pre>
-                                <button onClick={handleCopyToClipboard}>Copy</button>
-                            </div>
-                        </div>
-                    </div>
-                )}
+            <div className="form-group">
+                <label>File Encoding</label>
+                <input type="text" value={fileEncoding} onChange={(e) => setFileEncoding(e.target.value)} placeholder="e.g., cp932" />
             </div>
-
-            {/* Block B: Target Files XML Packing */}
-            <div className="card">
-                <h3>B. Pack Target Files to XML</h3>
-                <div className="form-group">
-                    <label>Target Files (Space-separated)</label>
-                    <input type="text" value={files} onChange={(e) => setFiles(e.target.value)} placeholder="src/main.rs src/lib.rs"/>
-                </div>
-                <button onClick={handlePackFiles}>Pack Target Files to XML</button>
-                {packedFilesPaths.length > 0 && repoMapData?.icon_file_path && (
-                  <div className="info-box" style={{marginTop: '1em'}}>
-                      <h4>Packed Files (Split)</h4>
-                      <div className="draggable-file-wrapper" style={{ flexWrap: 'wrap' }}>
-                          
-                          {/* NEW: 複数ファイルがある場合のみ「一括ドラッグ」アイコンを表示 */}
-                          {packedFilesPaths.length > 1 && (
-                              <div className="draggable-file" style={{ backgroundColor: 'rgba(57, 108, 216, 0.1)', borderColor: '#396cd8' }} draggable={true} onDragStart={(e) => handleDragFile(e, packedFilesPaths, repoMapData.icon_file_path!)}>
-                                  <svg width="64" height="80" viewBox="0 0 100 120"><path d="M0 4C0 1.8 1.8 0 4 0H65L100 35V116C100 118.2 98.2 120 96 120H4C1.8 120 0 118.2 0 116V4Z" fill="#396CD8"/><path d="M65 0V31C65 33.2 66.8 35 69 35H100L65 0Z" fill="#2952A3"/><text x="50" y="78" fill="white" fontSize="24" fontFamily="monospace" textAnchor="middle" fontWeight="bold">ALL</text></svg>
-                                  <span className="file-name" style={{ fontWeight: 'bold', color: '#396cd8' }}>Drag All ({packedFilesPaths.length})</span>
-                              </div>
-                          )}
-
-                          {packedFilesPaths.map((path, index) => (
-                              <div key={index} className="draggable-file" draggable={true} onDragStart={(e) => handleDragFile(e, [path], repoMapData.icon_file_path!)}>
-                                  <svg width="64" height="80" viewBox="0 0 100 120"><path d="M0 4C0 1.8 1.8 0 4 0H65L100 35V116C100 118.2 98.2 120 96 120H4C1.8 120 0 118.2 0 116V4Z" fill="#84A1E1"/><path d="M65 0V31C65 33.2 66.8 35 69 35H100L65 0Z" fill="#637BC8"/><text x="50" y="78" fill="white" fontSize="36" fontFamily="monospace" textAnchor="middle" fontWeight="bold">&lt;/&gt;</text></svg>
-                                  <span className="file-name">target_files_{index + 1}.{displayExt}</span>
-                              </div>
-                          ))}
+            <div className="form-group">
+                <label>Max Split Size (KB)</label>
+                <input type="number" value={maxFileSizeKb} onChange={(e) => setMaxFileSizeKb(e.target.value)} />
+            </div>
+            <div className="form-group">
+                <label>Map Tokens</label>
+                <input type="number" value={mapTokens} onChange={(e) => setMapTokens(e.target.value)} placeholder="e.g., 1024" />
+            </div>
+            <div className="form-group">
+                <label>Output Extension</label>
+                <input type="text" value={outputExtension} onChange={(e) => setOutputExtension(e.target.value)} placeholder="xml" />
+            </div>
+             <div className="form-group">
+                <label>Config File</label>
+                <button onClick={() => invoke("open_config_dir")}>Open Folder</button>
+            </div>
+        </div>
+        
+        <div className="tabs-container">
+          <div className="tabs">
+            <button className={`tab-button ${activeTab === 'A' ? 'active' : ''}`} onClick={() => setActiveTab('A')}>A. RepoMap & Prompt</button>
+            <button className={`tab-button ${activeTab === 'B' ? 'active' : ''}`} onClick={() => setActiveTab('B')}>B. Target Files</button>
+            <button className={`tab-button ${activeTab === 'C' ? 'active' : ''}`} onClick={() => setActiveTab('C')}>C. Apply Patch</button>
+          </div>
+          <div className="tab-content">
+            {activeTab === 'A' && (
+              <div className="card">
+                  <div className="form-group">
+                      <label>Operation Mode</label>
+                      <div className="mode-selector">
+                          <label><input type="radio" value="edit" checked={mode === 'edit'} onChange={() => setMode('edit')}/> Edit Code</label>
+                          <label><input type="radio" value="ask" checked={mode === 'ask'} onChange={() => setMode('ask')}/> Ask about Repo</label>
                       </div>
                   </div>
-                )}
-            </div>
-
-            {/* Block C: Patch Application */}
-            <div className="card">
-                <h3>C. Apply Patch</h3>
-                <div className="response-content">
-                    <textarea value={aiResponse} onChange={(e) => setAiResponse(e.target.value)} placeholder="Paste AI response with SEARCH/REPLACE blocks here..."/>
-                    <div className="button-group">
-                        <button onClick={handleApplyPatch}>Apply Patch</button>
+                  <div className="form-group">
+                      <label>Instructions for LLM</label>
+                      <textarea value={instruction} onChange={(e) => setInstruction(e.target.value)} placeholder="Fix the bug in..."/>
+                  </div>
+                  <button onClick={handleLaunchAider}>Generate</button>
+                  {repoMapData && (
+                      <div className="prompt-content">
+                          <div className="info-box">
+                              <h4>RepoMap File</h4>
+                              <div className="draggable-file-wrapper">
+                                  <div className="draggable-file" draggable={true} onDragStart={(e) => handleDragFile(e, [repoMapData.repo_map_file_path], repoMapData.icon_file_path)}>
+                                      <svg width="64" height="80" viewBox="0 0 100 120"><path d="M0 4C0 1.8 1.8 0 4 0H65L100 35V116C100 118.2 98.2 120 96 120H4C1.8 120 0 118.2 0 116V4Z" fill="#CF84E1"/><path d="M65 0V31C65 33.2 66.8 35 69 35H100L65 0Z" fill="#B463C8"/><text x="50" y="78" fill="white" fontSize="36" fontFamily="monospace" textAnchor="middle" fontWeight="bold">&lt;/&gt;</text></svg>
+                                      <span className="file-name">repo_map.{displayExt}</span>
+                                  </div>
+                              </div>
+                          </div>
+                          <div className="info-box">
+                              <h4>Prompt</h4>
+                              <div className="prompt-display">
+                                  <pre>{repoMapData.prompt}</pre>
+                                  <button onClick={handleCopyToClipboard}>Copy</button>
+                              </div>
+                          </div>
+                      </div>
+                  )}
+              </div>
+            )}
+            {activeTab === 'B' && (
+              <div className="card">
+                  <div className="form-group">
+                      <label>Target Files (Space-separated)</label>
+                      <input type="text" value={files} onChange={(e) => setFiles(e.target.value)} placeholder="src/main.rs src/lib.rs"/>
+                  </div>
+                  <button onClick={handlePackFiles}>Pack Files</button>
+                  {packedFilesPaths.length > 0 && repoMapData?.icon_file_path && (
+                    <div className="info-box" style={{marginTop: '1em'}}>
+                        <h4>Packed Files</h4>
+                        <div className="draggable-file-wrapper" style={{ flexWrap: 'wrap' }}>
+                            {packedFilesPaths.length > 1 && (
+                                <div className="draggable-file" style={{ backgroundColor: 'rgba(57, 108, 216, 0.1)', borderColor: '#396cd8' }} draggable={true} onDragStart={(e) => handleDragFile(e, packedFilesPaths, repoMapData.icon_file_path!)}>
+                                    <svg width="64" height="80" viewBox="0 0 100 120"><path d="M0 4C0 1.8 1.8 0 4 0H65L100 35V116C100 118.2 98.2 120 96 120H4C1.8 120 0 118.2 0 116V4Z" fill="#396CD8"/><path d="M65 0V31C65 33.2 66.8 35 69 35H100L65 0Z" fill="#2952A3"/><text x="50" y="78" fill="white" fontSize="24" fontFamily="monospace" textAnchor="middle" fontWeight="bold">ALL</text></svg>
+                                    <span className="file-name" style={{ fontWeight: 'bold', color: '#396cd8' }}>Drag All ({packedFilesPaths.length})</span>
+                                </div>
+                            )}
+                            {packedFilesPaths.map((path, index) => (
+                                <div key={index} className="draggable-file" draggable={true} onDragStart={(e) => handleDragFile(e, [path], repoMapData.icon_file_path!)}>
+                                    <svg width="64" height="80" viewBox="0 0 100 120"><path d="M0 4C0 1.8 1.8 0 4 0H65L100 35V116C100 118.2 98.2 120 96 120H4C1.8 120 0 118.2 0 116V4Z" fill="#84A1E1"/><path d="M65 0V31C65 33.2 66.8 35 69 35H100L65 0Z" fill="#637BC8"/><text x="50" y="78" fill="white" fontSize="36" fontFamily="monospace" textAnchor="middle" fontWeight="bold">&lt;/&gt;</text></svg>
+                                    <span className="file-name">target_files_{index + 1}.{displayExt}</span>
+                                </div>
+                            ))}
+                        </div>
                     </div>
-                </div>
-            </div>
+                  )}
+              </div>
+            )}
+            {activeTab === 'C' && (
+              <div className="card">
+                  <div className="response-content">
+                      <textarea value={aiResponse} onChange={(e) => setAiResponse(e.target.value)} placeholder="Paste AI response with SEARCH/REPLACE blocks here..."/>
+                      <div className="button-group">
+                          <button onClick={handleApplyPatch}>Apply Patch</button>
+                      </div>
+                  </div>
+              </div>
+            )}
           </div>
-        )}
+        </div>
       </main>
 
       <footer className="bottom-terminal">
