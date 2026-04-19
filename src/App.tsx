@@ -10,14 +10,21 @@ const DEFAULT_EDIT_PROMPT = "Read the attached context.xml, understand the conte
   "🚨 [CRITICAL FORMATTING RULES] 🚨\n" +
   "1. Omit all greetings and explanations.\n" +
   "2. Output ALL your modifications within a SINGLE markdown code block (` ```text ` or ` ``` `). Do NOT split them into multiple blocks, even if modifying multiple files.\n" +
-  "3. Inside the code block, you MUST write the 'target file path' on a single line immediately before its `<<<<<<< SEARCH` marker.\n\n" +
-  "Example Output Format:\n" +
+  "3. Inside the code block, you MUST write the exact 'target file path' on a single line immediately before EVERY `<<<<<<< SEARCH` marker.\n" +
+  "   ⚠️ IMPORTANT: If you modify the SAME file multiple times, you MUST repeat the file path before EACH and EVERY `<<<<<<< SEARCH` block. Do NOT omit it.\n\n" +
+  "Example Output Format (showing multiple edits in the same file):\n" +
   "```text\n" +
   "src/main.rs\n" +
   "<<<<<<< SEARCH\n" +
-  "// old code in main\n" +
+  "// first old code in main\n" +
   "=======\n" +
-  "// new code in main\n" +
+  "// first new code in main\n" +
+  ">>>>>>> REPLACE\n\n" +
+  "src/main.rs\n" +
+  "<<<<<<< SEARCH\n" +
+  "// second old code in main\n" +
+  "=======\n" +
+  "// second new code in main\n" +
   ">>>>>>> REPLACE\n\n" +
   "src/utils.rs\n" +
   "<<<<<<< SEARCH\n" +
