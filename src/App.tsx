@@ -80,6 +80,9 @@ function App() {
   const [tempApiPort, setTempApiPort] = useState(8080);
   const [tempGitPath, setTempGitPath] = useState("");
   const [tempChatLanguage, setTempChatLanguage] = useState("English");
+  const [tempMapTokens, setTempMapTokens] = useState("1024");
+  const [tempMaxFileSizeKb, setTempMaxFileSizeKb] = useState("80");
+  const [tempOutputExtension, setTempOutputExtension] = useState("xml");
   const [tempUseCustomPrompt, setTempUseCustomPrompt] = useState(false);
   const [tempCustomEditPrompt, setTempCustomEditPrompt] = useState(DEFAULT_EDIT_PROMPT);
   const [tempCustomAskPrompt, setTempCustomAskPrompt] = useState(DEFAULT_ASK_PROMPT);
@@ -170,6 +173,9 @@ function App() {
     setTempApiPort(apiPort);
     setTempGitPath(gitPath);
     setTempChatLanguage(chatLanguage);
+    setTempMapTokens(mapTokens);
+    setTempMaxFileSizeKb(maxFileSizeKb);
+    setTempOutputExtension(outputExtension);
     setTempUseCustomPrompt(useCustomPrompt);
     setTempCustomEditPrompt(customEditPrompt);
     setTempCustomAskPrompt(customAskPrompt);
@@ -181,6 +187,9 @@ function App() {
     setApiPort(tempApiPort);
     setGitPath(tempGitPath);
     setChatLanguage(tempChatLanguage);
+    setMapTokens(tempMapTokens);
+    setMaxFileSizeKb(tempMaxFileSizeKb);
+    setOutputExtension(tempOutputExtension);
     setUseCustomPrompt(tempUseCustomPrompt);
     setCustomEditPrompt(tempCustomEditPrompt);
     setCustomAskPrompt(tempCustomAskPrompt);
@@ -297,104 +306,103 @@ function App() {
   return (
     <div className="app-container">
       <header className="status-header">
-        <div className="stepper">
-          <span>A. RepoMap</span> | <span>B. Target Files</span> | <span>C. Apply Patch</span>
+        <h2 style={{ margin: 0, fontSize: '1.2em' }}>LLM Prompt Proxy</h2>
+        <div className="header-actions">
+          <button onClick={handleReset} className="abort-button">⏹ 中止 (Abort)</button>
+          <button className="settings-button" onClick={handleOpenSettings}>⚙️ アプリ設定</button>
         </div>
-        <button onClick={handleReset} className="reset-button">🔄 Reload</button>
       </header>
 
       {showSettings && (
         <div className="modal-overlay" onClick={handleCancelSettings}>
           <div className="settings-container" onClick={(e) => e.stopPropagation()}>
-            <h2>Application Settings</h2>
-            <div className="form-group">
-              <label>Aider Path (Executable Path)</label>
-              <input type="text" value={tempAiderPath} onChange={(e) => setTempAiderPath(e.target.value)} placeholder="aider"/>
-            </div>
-            <div className="form-group">
-              <label>API Port (Proxy Server Port)</label>
-              <input type="number" value={tempApiPort} onChange={(e) => setTempApiPort(Number(e.target.value))}/>
-            </div>
-            <div className="form-group">
-              <label>Git Path (Optional. e.g. C:\Program Files\Git\cmd)</label>
-              <input type="text" value={tempGitPath} onChange={(e) => setTempGitPath(e.target.value)} placeholder="Leave blank if git is in PATH" />
-            </div>
-            <div className="form-group">
-              <label>Chat Language (Aider's thinking/response language)</label>
-              <input type="text" value={tempChatLanguage} onChange={(e) => setTempChatLanguage(e.target.value)} placeholder="e.g. English, Japanese"/>
-            </div>
-            <div className="form-group">
-              <div className="mode-selector">
-                <label><input type="radio" checked={!tempUseCustomPrompt} onChange={() => setTempUseCustomPrompt(false)}/> Use default prompts</label>
-                <label><input type="radio" checked={tempUseCustomPrompt} onChange={() => setTempUseCustomPrompt(true)}/> Use custom prompts</label>
+            <h2>アプリ設定 (App Settings)</h2>
+            <div className="settings-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1em' }}>
+              <div className="form-group">
+                <label>Aiderコマンドライン</label>
+                <input type="text" value={tempAiderPath} onChange={(e) => setTempAiderPath(e.target.value)} />
+              </div>
+              <div className="form-group">
+                <label>Aider接続ポート</label>
+                <input type="number" value={tempApiPort} onChange={(e) => setTempApiPort(Number(e.target.value))} />
+              </div>
+              <div className="form-group">
+                <label>チャット言語</label>
+                <input type="text" value={tempChatLanguage} onChange={(e) => setTempChatLanguage(e.target.value)} />
+              </div>
+              <div className="form-group">
+                <label>RepoMap最大トークン数</label>
+                <input type="number" value={tempMapTokens} onChange={(e) => setTempMapTokens(e.target.value)} />
+              </div>
+              <div className="form-group">
+                <label>出力ファイルサイズ (KB)</label>
+                <input type="number" value={tempMaxFileSizeKb} onChange={(e) => setTempMaxFileSizeKb(e.target.value)} />
+              </div>
+              <div className="form-group">
+                <label>出力ファイル拡張子</label>
+                <input type="text" value={tempOutputExtension} onChange={(e) => setTempOutputExtension(e.target.value)} />
+              </div>
+              <div className="form-group">
+                <label>Gitパス (任意)</label>
+                <input type="text" value={tempGitPath} onChange={(e) => setTempGitPath(e.target.value)} />
               </div>
             </div>
+
+            <div className="form-group" style={{ marginTop: '1.5em' }}>
+              <label>プロンプト設定</label>
+              <div className="mode-selector">
+                <label><input type="radio" checked={!tempUseCustomPrompt} onChange={() => setTempUseCustomPrompt(false)}/> デフォルト</label>
+                <label><input type="radio" checked={tempUseCustomPrompt} onChange={() => setTempUseCustomPrompt(true)}/> カスタム</label>
+              </div>
+            </div>
+
             {tempUseCustomPrompt && (
               <>
                 <div className="form-group">
-                  <label>Prompt for Code Edit (Edit)</label>
+                  <label>Editモード用プロンプト</label>
                   <textarea value={tempCustomEditPrompt} onChange={(e) => setTempCustomEditPrompt(e.target.value)}/>
-                  <p className="prompt-hint">* User instruction will be inserted at {`{instruction}`}</p>
                 </div>
                 <div className="form-group">
-                  <label>Prompt for Repository Q&A (Ask)</label>
+                  <label>Askモード用プロンプト</label>
                   <textarea value={tempCustomAskPrompt} onChange={(e) => setTempCustomAskPrompt(e.target.value)}/>
-                  <p className="prompt-hint">* User instruction will be inserted at {`{instruction}`}</p>
                 </div>
               </>
             )}
-            <div className="button-group" style={{ marginTop: '1em' }}>
-              <button onClick={() => { setTempCustomEditPrompt(DEFAULT_EDIT_PROMPT); setTempCustomAskPrompt(DEFAULT_ASK_PROMPT); }}>Reset Prompts</button>
-              <button onClick={handleCancelSettings}>Cancel</button>
-              <button onClick={handleSaveSettings}>Save and Close</button>
+
+            <div className="button-group" style={{ marginTop: '2em', display: 'flex', gap: '1em' }}>
+              <button onClick={handleSaveSettings} style={{ flex: 1, backgroundColor: '#396cd8', color: 'white' }}>保存 (Save)</button>
+              <button onClick={handleCancelSettings} style={{ flex: 1 }}>キャンセル (Cancel)</button>
+            </div>
+            <div className="button-group" style={{ marginTop: '1em', display: 'flex', gap: '1em' }}>
+              <button onClick={() => invoke("open_config_dir")} style={{ flex: 1 }}>設定フォルダを開く</button>
+              <button onClick={() => { setTempCustomEditPrompt(DEFAULT_EDIT_PROMPT); setTempCustomAskPrompt(DEFAULT_ASK_PROMPT); }} style={{ flex: 1 }}>プロンプト初期化</button>
             </div>
           </div>
         </div>
       )}
 
       <main className="main-content">
-        <div className="main-header">
-          <h1>LLM Prompt Proxy</h1>
-          <button className="settings-button" onClick={handleOpenSettings}>⚙️ Settings</button>
-        </div>
-
-        <div className="card project-settings-container">
-            <h3>Project Settings</h3>
-            <div className="form-group">
-                <label>Target Project Directory</label>
+        <div className="card project-settings-container" style={{ display: 'flex', gap: '1em', marginBottom: '1em', paddingBottom: '0.5em' }}>
+            <div className="form-group" style={{ flex: 2 }}>
+                <label>プロジェクトパス (Target Directory)</label>
                 <div className="input-group">
                     <input type="text" value={targetDir} onChange={(e) => setTargetDir(e.target.value)} placeholder="/path/to/your/project" />
                     <button onClick={handleSelectDirectory}>Select</button>
                 </div>
             </div>
-            <div className="form-group">
-                <label>File Encoding</label>
-                <input type="text" value={fileEncoding} onChange={(e) => setFileEncoding(e.target.value)} placeholder="e.g., cp932" />
-            </div>
-            <div className="form-group">
-                <label>Max Split Size (KB)</label>
-                <input type="number" value={maxFileSizeKb} onChange={(e) => setMaxFileSizeKb(e.target.value)} />
-            </div>
-            <div className="form-group">
-                <label>Map Tokens</label>
-                <input type="number" value={mapTokens} onChange={(e) => setMapTokens(e.target.value)} placeholder="e.g., 1024" />
-            </div>
-            <div className="form-group">
-                <label>Output Extension</label>
-                <input type="text" value={outputExtension} onChange={(e) => setOutputExtension(e.target.value)} placeholder="xml" />
-            </div>
-             <div className="form-group">
-                <label>Config File</label>
-                <button onClick={() => invoke("open_config_dir")}>Open Folder</button>
+            <div className="form-group" style={{ flex: 1 }}>
+                <label>文字エンコーディング</label>
+                <input type="text" value={fileEncoding} onChange={(e) => setFileEncoding(e.target.value)} placeholder="utf-8" />
             </div>
         </div>
         
         <div className="tabs-container">
           <div className="tabs">
-            <button className={`tab-button ${activeTab === 'A' ? 'active' : ''}`} onClick={() => setActiveTab('A')}>A. RepoMap & Prompt</button>
-            <button className={`tab-button ${activeTab === 'B' ? 'active' : ''}`} onClick={() => setActiveTab('B')}>B. Target Files</button>
-            <button className={`tab-button ${activeTab === 'C' ? 'active' : ''}`} onClick={() => setActiveTab('C')}>C. Apply Patch</button>
+            <button className={`tab-button ${activeTab === 'A' ? 'active' : ''}`} onClick={() => setActiveTab('A')}>RepoMap / プロンプト</button>
+            <button className={`tab-button ${activeTab === 'B' ? 'active' : ''}`} onClick={() => setActiveTab('B')}>追加ファイル</button>
+            <button className={`tab-button ${activeTab === 'C' ? 'active' : ''}`} onClick={() => setActiveTab('C')}>パッチ適用</button>
           </div>
+          
           <div className="tab-content">
             {activeTab === 'A' && (
               <div className="card">
@@ -409,9 +417,9 @@ function App() {
                       <label>Instructions for LLM</label>
                       <textarea value={instruction} onChange={(e) => setInstruction(e.target.value)} placeholder="Fix the bug in..."/>
                   </div>
-                  <button onClick={handleLaunchAider}>Generate</button>
+                  <button onClick={handleLaunchAider}>Generate RepoMap & Prompt</button>
                   {repoMapData && (
-                      <div className="prompt-content">
+                      <div className="prompt-content" style={{ marginTop: '1em' }}>
                           <div className="info-box">
                               <h4>RepoMap File</h4>
                               <div className="draggable-file-wrapper">
@@ -432,6 +440,7 @@ function App() {
                   )}
               </div>
             )}
+            
             {activeTab === 'B' && (
               <div className="card">
                   <div className="form-group">
@@ -460,11 +469,12 @@ function App() {
                   )}
               </div>
             )}
+            
             {activeTab === 'C' && (
               <div className="card">
                   <div className="response-content">
                       <textarea value={aiResponse} onChange={(e) => setAiResponse(e.target.value)} placeholder="Paste AI response with SEARCH/REPLACE blocks here..."/>
-                      <div className="button-group">
+                      <div className="button-group" style={{ marginTop: '1em' }}>
                           <button onClick={handleApplyPatch}>Apply Patch</button>
                       </div>
                   </div>
