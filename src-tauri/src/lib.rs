@@ -299,6 +299,7 @@ async fn apply_patch(
     command.arg("--apply").arg(&patch_file_path);
     command.arg("--yes");
     command.arg("--no-analytics");
+    command.arg("--no-auto-commits"); // 追加: パッチ適用後の自動コミットとAPI通信を遮断
 
     if !python_enc.is_empty() {
         command.arg("--encoding").arg(python_enc);
