@@ -57,6 +57,7 @@ interface AppConfig {
 }
 
 function App() {
+  const [isProcessing, setIsProcessing] = useState(false);
   const [activeTab, setActiveTab] = useState("A");
   const [mode, setMode] = useState<"edit" | "ask">("edit");
   const [targetDir, setTargetDir] = useState("");
@@ -169,9 +170,14 @@ function App() {
       setLogs(prev => [...prev, event.payload]);
     });
 
+    const unlistenFinished = listen<boolean>("aider_finished", () => {
+      setIsProcessing(false);
+    });
+
     return () => {
       unlisten.then((fn) => fn());
       unlistenAiderLog.then((fn) => fn());
+      unlistenFinished.then((fn) => fn());
     };
   }, []);
 
@@ -216,6 +222,7 @@ function App() {
   };
 
   const handleReset = async () => {
+    setIsProcessing(false);
     await invoke("reset_aider_state");
     setRepoMapData(null);
     setPackedFilesPaths([]);
@@ -223,6 +230,7 @@ function App() {
   };
 
   const handleApplyPatch = async () => {
+    setIsProcessing(true);
     setLogs(prev => [...prev, `--- PromptProxy: Applying patch via Aider [${new Date().toLocaleTimeString()}] ---`]);
     await invoke("apply_patch", {
       targetDir,
@@ -263,6 +271,8 @@ function App() {
   };
 
   const handleLaunchAider = async () => {
+    setIsProcessing(true);
+    setRepoMapData(null);
     // Aiderをクラッシュさせる /ask の代わりに、Rustだけが解釈できる独自タグを付与
     const finalMessage = mode === "ask" ? `[MODE:ASK]\n${instruction}` : instruction;
     await invoke("launch_aider_batch", {
@@ -315,7 +325,7 @@ function App() {
       <header className="status-header">
         <h2 style={{ margin: 0, fontSize: '1.2em' }}>LLM Prompt Proxy</h2>
         <div className="header-actions">
-          <button onClick={handleReset} className="abort-button">⏹ Abort</button>
+          <button onClick={handleReset} className="abort-button">⏹ Abort / Reset</button>
           <button className="settings-button" onClick={handleOpenSettings}>⚙️ Settings</button>
         </div>
       </header>
@@ -424,7 +434,7 @@ function App() {
                       <label>Instructions for LLM</label>
                       <textarea value={instruction} onChange={(e) => setInstruction(e.target.value)} placeholder="Fix the bug in..."/>
                   </div>
-                  <button onClick={handleLaunchAider}>Generate RepoMap & Prompt</button>
+                  <button onClick={handleLaunchAider} disabled={isProcessing}>{isProcessing ? "Processing..." : "Generate RepoMap & Prompt"}</button>
                   {repoMapData && (
                       <div className="prompt-content" style={{ marginTop: '1em' }}>
                           <div className="info-box">
@@ -487,9 +497,7 @@ function App() {
                         placeholder="Paste the full response from your Web LLM here..."
                       />
                   </div>
-                  <button onClick={handleApplyPatch} style={{ width: '100%', marginTop: '0.5em' }}>
-                      Apply Patch to Files
-                  </button>
+                  <button onClick={handleApplyPatch} style={{ width: '100%', marginTop: '0.5em' }} disabled={isProcessing}>{isProcessing ? "Applying..." : "Apply Patch to Files"}</button>
               </div>
             )}
           </div>

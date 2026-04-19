@@ -5,7 +5,7 @@ use std::thread;
 use std::time::Duration;
 use tauri::{Emitter, Manager};
 
-pub struct AiderProcessState(pub Mutex<Vec<Child>>);
+pub struct AiderProcessState(pub Mutex<Vec<u32>>);
 
 pub struct AiderSession {
     pub target_dir: String,
@@ -153,6 +153,9 @@ pub fn spawn_aider_process(app_handle: &tauri::AppHandle, target_dir: String, _f
 
     match command.spawn() {
         Ok(mut child) => {
+            let pid = child.id();
+            state.0.lock().unwrap().push(pid);
+
             if let Some(stdout) = child.stdout.take() {
                 let app_handle_clone = app_handle_clone.clone();
                 std::thread::spawn(move || {
@@ -181,7 +184,19 @@ pub fn spawn_aider_process(app_handle: &tauri::AppHandle, target_dir: String, _f
                     }
                 });
             }
-            state.0.lock().unwrap().push(child);
+            
+            // プロセス終了を監視してイベントを発火
+            let app_handle_clone = app_handle.clone();
+            std::thread::spawn(move || {
+                let status = child.wait().unwrap();
+                let _ = app_handle_clone.emit("aider_log", format!("--- Operation Finished ({}) ---", status));
+                let _ = app_handle_clone.emit("aider_finished", status.success());
+
+                // 状態からPIDを削除
+                let state = app_handle_clone.state::<AiderProcessState>();
+                let mut pids = state.0.lock().unwrap();
+                pids.retain(|&p| p != pid);
+            });
         }
         Err(e) => {
             let err_msg = format!("[Error] Failed to spawn aider in '{}': {}", target_dir, e);
@@ -311,7 +326,11 @@ async fn apply_patch(
     let app_handle_clone = app_handle.clone();
     match command.spawn() {
         Ok(mut child) => {
-            if let Some(stdout) = child.stdout.take() {
+            let pid = child.id();
+            let state = app_handle.state::<crate::AiderProcessState>();
+            state.0.lock().unwrap().push(pid);
+
+            if let Some(stdout) = child.stdout.take() { /* 既存のstdoutスレッド */
                 let app_handle_clone = app_handle_clone.clone();
                 std::thread::spawn(move || {
                     use std::io::BufRead;
@@ -325,7 +344,7 @@ async fn apply_patch(
                     }
                 });
             }
-            if let Some(stderr) = child.stderr.take() {
+            if let Some(stderr) = child.stderr.take() { /* 既存のstderrスレッド */
                 let app_handle_clone = app_handle_clone.clone();
                 std::thread::spawn(move || {
                     use std::io::BufRead;
@@ -339,6 +358,18 @@ async fn apply_patch(
                     }
                 });
             }
+
+            // プロセス終了監視
+            let app_handle_clone = app_handle.clone();
+            std::thread::spawn(move || {
+                let status = child.wait().unwrap();
+                let _ = app_handle_clone.emit("aider_log", format!("--- Patch Applied ({}) ---", status));
+                let _ = app_handle_clone.emit("aider_finished", status.success());
+
+                let state = app_handle_clone.state::<crate::AiderProcessState>();
+                let mut pids = state.0.lock().unwrap();
+                pids.retain(|&p| p != pid);
+            });
         }
         Err(e) => {
             let _ = app_handle.emit("aider_log", format!("[Error] Failed to apply patch: {}", e));
@@ -349,15 +380,18 @@ async fn apply_patch(
 
 #[tauri::command]
 async fn reset_aider_state(
-    _app_state: tauri::State<'_, crate::api::AppState>,
     process_state: tauri::State<'_, AiderProcessState>,
+    app_handle: tauri::AppHandle,
 ) -> Result<(), String> {
-    println!("=> [PromptProxy] Resetting system state and killing Aider processes...");
-    let mut processes = process_state.0.lock().unwrap();
-    for mut child in processes.drain(..) {
-        let _ = child.kill();
-        let _ = child.wait();
+    let _ = app_handle.emit("aider_log", "=> [PromptProxy] Aborting current operation...".to_string());
+    let mut pids = process_state.0.lock().unwrap();
+    for pid in pids.drain(..) {
+        #[cfg(unix)]
+        let _ = std::process::Command::new("kill").args(["-INT", &pid.to_string()]).status();
+        #[cfg(windows)]
+        let _ = std::process::Command::new("taskkill").args(["/PID", &pid.to_string(), "/F"]).status();
     }
+    let _ = app_handle.emit("aider_finished", false);
     Ok(())
 }
 
@@ -400,37 +434,12 @@ pub fn run() {
     app.run(|app_handle, event| {
         if let tauri::RunEvent::Exit = event {
             let state = app_handle.state::<AiderProcessState>();
-            let mut processes = state.0.lock().unwrap();
-            for mut child in processes.drain(..) {
-                let pid = child.id();
-
-                // 1. Ctrl+C と同じ割り込みシグナル(SIGINT)を送る
+            let mut pids = state.0.lock().unwrap();
+            for pid in pids.drain(..) {
                 #[cfg(unix)]
-                let _ = std::process::Command::new("kill")
-                    .args(["-INT", &pid.to_string()])
-                    .status();
+                let _ = std::process::Command::new("kill").args(["-INT", &pid.to_string()]).status();
                 #[cfg(windows)]
-                let _ = std::process::Command::new("taskkill")
-                    .args(["/PID", &pid.to_string()])
-                    .status();
-
-                // 2. 最大2秒間、Graceful Shutdown を待機する
-                let mut exited = false;
-                for _ in 0..20 {
-                    if let Ok(Some(_)) = child.try_wait() {
-                        exited = true;
-                        break;
-                    }
-                    thread::sleep(Duration::from_millis(100));
-                }
-
-                // 3. それでも終了していなければ強制終了（KILL）
-                if !exited {
-                    println!("プロセス {} がタイムアウトしました。強制終了します...", pid);
-                    let _ = child.kill();
-                }
-                // 最後にゾンビプロセス回収のためにwait
-                let _ = child.wait();
+                let _ = std::process::Command::new("taskkill").args(["/PID", &pid.to_string(), "/F"]).status();
             }
         }
     });
