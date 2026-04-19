@@ -472,12 +472,17 @@ function App() {
             
             {activeTab === 'C' && (
               <div className="card">
-                  <div className="response-box">
-                      <textarea value={aiResponse} onChange={(e) => setAiResponse(e.target.value)} placeholder="Paste AI response with SEARCH/REPLACE blocks here..."/>
-                      <div className="button-group" style={{ marginTop: '1em' }}>
-                          <button onClick={handleApplyPatch}>Apply Patch</button>
-                      </div>
+                  <div className="form-group">
+                      <label>AI Response (SEARCH/REPLACE Blocks)</label>
+                      <textarea 
+                        value={aiResponse} 
+                        onChange={(e) => setAiResponse(e.target.value)} 
+                        placeholder="Paste the full response from your Web LLM here..."
+                      />
                   </div>
+                  <button onClick={handleApplyPatch} style={{ width: '100%', marginTop: '0.5em' }}>
+                      Apply Patch to Files
+                  </button>
               </div>
             )}
           </div>

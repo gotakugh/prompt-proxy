@@ -371,11 +371,17 @@ button {
   margin-top: 0.5em;
 }
 
-.info-box, .response-box {
+.info-box {
   margin-bottom: 1em;
   padding: 0.8em;
   border-radius: 8px;
   background-color: rgba(0, 0, 0, 0.05);
+}
+
+.response-box {
+  background-color: transparent;
+  padding: 0;
+  margin-bottom: 1em;
 }
 
 .info-box h3, .response-box h3 {
@@ -449,19 +455,33 @@ button {
   right: 0.5em;
 }
 
-.response-box textarea {
-  box-sizing: border-box;
+/* --- Standardized Input & Textarea Styles --- */
+input[type="text"],
+input[type="number"],
+textarea {
   width: 100%;
-  min-height: 250px;
-  padding: 0.5em;
-  margin-bottom: 1em;
+  box-sizing: border-box;
   border-radius: 8px;
   border: 1px solid #ccc;
-  font-family: inherit;
+  padding: 0.8em;
   font-size: 1em;
+  font-family: inherit;
   background-color: #ffffff;
   color: #0f0f0f;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05); /* 統一された軽いシャドウ */
+  transition: border-color 0.2s, box-shadow 0.2s;
+  outline: none;
+}
+
+textarea {
+  min-height: 250px; /* 約10行分の高さ */
   resize: vertical;
+}
+
+input:focus,
+textarea:focus {
+  border-color: #396cd8;
+  box-shadow: 0 0 0 2px rgba(57, 108, 216, 0.2);
 }
 
 .response-box button {
@@ -546,10 +566,13 @@ button {
   .prompt-display pre {
     background-color: rgba(255, 255, 255, 0.1);
   }
-  .response-box textarea {
-    background-color: #0f0f0f98;
-    color: #ffffff;
-    border-color: #555;
+
+  input[type="text"],
+  input[type="number"],
+  textarea {
+    background-color: #1a1a1a;
+    color: #f6f6f6;
+    border-color: #444;
   }
 
   .draggable-file {
