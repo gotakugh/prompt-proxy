@@ -8,32 +8,20 @@ import "./App.css";
 const DEFAULT_EDIT_PROMPT = "Read the attached context.xml, understand the context, and modify the code according to the instructions below.\n\n" +
   "=== Instructions ===\n{instruction}\n================\n\n" +
   "🚨 [CRITICAL FORMATTING RULES] 🚨\n" +
-  "1. Omit all greetings and explanations.\n" +
-  "2. Output ALL your modifications within a SINGLE markdown code block (` ```text ` or ` ``` `). Do NOT split them into multiple blocks, even if modifying multiple files.\n" +
-  "3. Inside the code block, you MUST write the exact 'target file path' on a single line immediately before EVERY `<<<<<<< SEARCH` marker.\n" +
-  "   ⚠️ IMPORTANT: If you modify the SAME file multiple times, you MUST repeat the file path before EACH and EVERY `<<<<<<< SEARCH` block. Do NOT omit it.\n\n" +
-  "Example Output Format (showing multiple edits in the same file):\n" +
+  "1. Output ALL your modifications within a SINGLE markdown code block (` ```text ` or ` ``` `). Do NOT split them into multiple blocks.\n" +
+  "2. You MUST write the exact 'target file path' on a single line immediately before EVERY `<<<<<<< SEARCH` marker. If you modify the same file multiple times, repeat the file path before each block.\n" +
+  "3. The `<<<<<<< SEARCH` block MUST contain the EXACT original lines from the file. DO NOT abbreviate, DO NOT use placeholders like `// old code...`. It must be a perfect line-for-line match, including indentation.\n" +
+  "4. Keep the SEARCH blocks reasonably short (a few lines of context) but unique enough to find the correct location.\n\n" +
+  "Example Output Format:\n" +
   "```text\n" +
-  "src/main.rs\n" +
+  "src/App.tsx\n" +
   "<<<<<<< SEARCH\n" +
-  "// first old code in main\n" +
+  "    const [activeTab, setActiveTab] = useState(\"A\");\n" +
   "=======\n" +
-  "// first new code in main\n" +
-  ">>>>>>> REPLACE\n\n" +
-  "src/main.rs\n" +
-  "<<<<<<< SEARCH\n" +
-  "// second old code in main\n" +
-  "=======\n" +
-  "// second new code in main\n" +
-  ">>>>>>> REPLACE\n\n" +
-  "src/utils.rs\n" +
-  "<<<<<<< SEARCH\n" +
-  "// old code in utils\n" +
-  "=======\n" +
-  "// new code in utils\n" +
+  "    const [activeTab, setActiveTab] = useState(\"B\");\n" +
   ">>>>>>> REPLACE\n" +
   "```\n\n" +
-  "4. ONLY if you determine that necessary files are missing from context.xml, DO NOT output the code modification block. Instead, output the missing file paths in a single code block and ask the user to add them.";
+  "5. ONLY if you determine that necessary files are missing from context.xml, do NOT output the code modification block. Instead, output the missing file paths in a single code block and ask the user to add them.";
 
 const DEFAULT_ASK_PROMPT = "Read the attached context.xml, understand the repository context, and answer the following question.\n\n=== Question ===\n{instruction}\n==============\n\n[IMPORTANT]\nIf you determine that necessary files are missing from context.xml to answer the question, please tell the user which files are missing. Output the missing file paths in a single markdown code block (so the user can easily copy them), and ask the user to add them to the 'Target Files' input and run again.";
 
