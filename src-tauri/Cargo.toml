@@ -1,8 +1,10 @@
 [package]
 name = "prompt-proxy"
 version = "0.1.0"
-description = "A Tauri App"
-authors = ["you"]
+description = "A local AI coding tool proxy for Web LLMs"
+authors = ["gotaku (gotakugh)"]
+license = "GPL-3.0-or-later"
+repository = "https://github.com/gotakugh/prompt-proxy"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html

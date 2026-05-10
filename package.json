@@ -2,6 +2,13 @@
   "name": "prompt-proxy",
   "private": true,
   "version": "0.1.0",
+  "description": "A local AI coding tool proxy for Web LLMs",
+  "author": "gotaku (gotakugh)",
+  "license": "GPL-3.0-or-later",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/gotakugh/prompt-proxy.git"
+  },
   "type": "module",
   "scripts": {
     "dev": "vite",
