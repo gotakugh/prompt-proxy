@@ -51,6 +51,7 @@ function App() {
   const [targetDir, setTargetDir] = useState("");
   const [targetFiles, setTargetFiles] = useState<{path: string, included: boolean}[]>([]);
   const [fileInput, setFileInput] = useState("");
+  const [fileSuggestions, setFileSuggestions] = useState<string[]>([]);
   const [instruction, setInstruction] = useState("");
   const [fileEncoding, setFileEncoding] = useState("");
   const [mapTokens, setMapTokens] = useState("");
@@ -61,7 +62,7 @@ function App() {
   const [apiPort, setApiPort] = useState(8080);
   const [repoMapData, setRepoMapData] = useState<RepoMapPayload | null>(null);
   const [maxFileSizeKb, setMaxFileSizeKb] = useState("80");
-  const [packedFilesPaths, setPackedFilesPaths] = useState<string[]>([]);
+  const [packedFiles, setPackedFiles] = useState<{path: string, size_kb: number}[]>([]);
   const [aiResponse, setAiResponse] = useState("");
   const [logs, setLogs] = useState<string[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -140,6 +141,16 @@ function App() {
 
   // Sync settings that are still needed by Rust backend in memory
   useEffect(() => {
+    if (targetDir) {
+      invoke<string[]>("get_directory_files", { targetDir })
+        .then(setFileSuggestions)
+        .catch(console.error);
+    } else {
+      setFileSuggestions([]);
+    }
+  }, [targetDir]);
+
+  useEffect(() => {
     const settingsForRust = {
       use_custom: useCustomPrompt,
       custom_edit_prompt: customEditPrompt,
@@ -215,7 +226,7 @@ function App() {
     await invoke("reset_aider_state");
     setRepoMapData(null);
     setTargetFiles([]);
-    setPackedFilesPaths([]);
+    setPackedFiles([]);
     setAiResponse("");
   };
 
@@ -236,15 +247,15 @@ function App() {
     const activeFilesStr = targetFiles.filter(f => f.included).map(f => f.path).join(" ");
     setLogs(prev => [...prev, `--- PromptProxy: Packing target files... [${new Date().toLocaleTimeString()}] ---`]);
     try {
-      const paths = await invoke<string[]>("pack_target_files", {
+      const result = await invoke<{path: string, size_kb: number}[]>("pack_target_files", {
         targetDir,
         files: activeFilesStr,
         fileEncoding,
         maxFileSizeKb: Number(maxFileSizeKb) || 0,
         outputExtension,
       });
-      setPackedFilesPaths(paths);
-      setLogs(prev => [...prev, `--- PromptProxy: Successfully packed into ${paths.length} file(s) ---`]);
+      setPackedFiles(result);
+      setLogs(prev => [...prev, `--- PromptProxy: Successfully packed into ${result.length} file(s) ---`]);
     } catch (error) {
       setLogs(prev => [...prev, `--- PromptProxy: Error packing files: ${error} ---`]);
       console.error("Failed to pack files:", error);
@@ -469,9 +480,13 @@ function App() {
                             }
                           }}
                           placeholder="src/main.rs src/lib.rs"
+                          list="file-suggestions"
                         />
                         <button onClick={() => setTargetFiles([])} className="reset-button">Clear All</button>
                       </div>
+                      <datalist id="file-suggestions">
+                        {fileSuggestions.map((s, i) => <option key={i} value={s} />)}
+                      </datalist>
                   </div>
 
                   <div style={{ maxHeight: '200px', overflowY: 'auto', marginBottom: '1em', border: '1px solid #ccc', borderRadius: '6px', padding: '0.5em', backgroundColor: 'rgba(0,0,0,0.02)' }}>
@@ -515,20 +530,22 @@ function App() {
                   >
                     Pack Files ({targetFiles.filter(f => f.included).length} selected)
                   </button>
-                  {packedFilesPaths.length > 0 && repoMapData?.icon_file_path && (
+                  {packedFiles.length > 0 && repoMapData?.icon_file_path && (
                     <div className="info-box" style={{marginTop: '1em'}}>
                         <h4>Packed Files</h4>
                         <div className="draggable-file-wrapper" style={{ flexWrap: 'wrap' }}>
-                            {packedFilesPaths.length > 1 && (
-                                <div className="draggable-file" style={{ backgroundColor: 'rgba(57, 108, 216, 0.1)', borderColor: '#396cd8' }} draggable={true} onDragStart={(e) => handleDragFile(e, packedFilesPaths, repoMapData.icon_file_path!)}>
+                            {packedFiles.length > 1 && (
+                                <div className="draggable-file" style={{ backgroundColor: 'rgba(57, 108, 216, 0.1)', borderColor: '#396cd8' }} draggable={true} onDragStart={(e) => handleDragFile(e, packedFiles.map(f => f.path), repoMapData.icon_file_path!)}>
                                     <svg width="64" height="80" viewBox="0 0 100 120"><path d="M0 4C0 1.8 1.8 0 4 0H65L100 35V116C100 118.2 98.2 120 96 120H4C1.8 120 0 118.2 0 116V4Z" fill="#396CD8"/><path d="M65 0V31C65 33.2 66.8 35 69 35H100L65 0Z" fill="#2952A3"/><text x="50" y="78" fill="white" fontSize="24" fontFamily="monospace" textAnchor="middle" fontWeight="bold">ALL</text></svg>
-                                    <span className="file-name" style={{ fontWeight: 'bold', color: '#396cd8' }}>Drag All ({packedFilesPaths.length})</span>
+                                    <span className="file-name" style={{ fontWeight: 'bold', color: '#396cd8' }}>Drag All ({packedFiles.length})</span>
+                                    <div style={{ fontSize: '0.8em', color: '#666' }}>{packedFiles.reduce((sum, f) => sum + f.size_kb, 0).toFixed(1)} KB</div>
                                 </div>
                             )}
-                            {packedFilesPaths.map((path, index) => (
-                                <div key={index} className="draggable-file" draggable={true} onDragStart={(e) => handleDragFile(e, [path], repoMapData.icon_file_path!)}>
+                            {packedFiles.map((file, index) => (
+                                <div key={index} className="draggable-file" draggable={true} onDragStart={(e) => handleDragFile(e, [file.path], repoMapData.icon_file_path!)}>
                                     <svg width="64" height="80" viewBox="0 0 100 120"><path d="M0 4C0 1.8 1.8 0 4 0H65L100 35V116C100 118.2 98.2 120 96 120H4C1.8 120 0 118.2 0 116V4Z" fill="#84A1E1"/><path d="M65 0V31C65 33.2 66.8 35 69 35H100L65 0Z" fill="#637BC8"/><text x="50" y="78" fill="white" fontSize="36" fontFamily="monospace" textAnchor="middle" fontWeight="bold">&lt;/&gt;</text></svg>
                                     <span className="file-name">target_files_{index + 1}.{displayExt}</span>
+                                    <div style={{ fontSize: '0.8em', color: '#666' }}>{file.size_kb.toFixed(1)} KB</div>
                                 </div>
                             ))}
                         </div>
