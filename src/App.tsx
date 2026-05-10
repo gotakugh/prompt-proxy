@@ -62,6 +62,7 @@ function App() {
   const [chatLanguage, setChatLanguage] = useState("English");
   const [aiderPath, setAiderPath] = useState("aider");
   const [apiPort, setApiPort] = useState(8080);
+  const [activeApiPort, setActiveApiPort] = useState(8080);
   const [repoMapData, setRepoMapData] = useState<RepoMapPayload | null>(null);
   const [maxFileSizeKb, setMaxFileSizeKb] = useState("80");
   const [packedFiles, setPackedFiles] = useState<{path: string, size_kb: number}[]>([]);
@@ -161,7 +162,9 @@ function App() {
       custom_ask_prompt: customAskPrompt,
     };
     invoke("update_prompt_settings", { settings: settingsForRust }).catch(console.error);
-    invoke("start_api_server", { port: Number(apiPort) }).catch(console.error);
+    invoke<number>("start_api_server", { port: Number(apiPort) })
+      .then(port => setActiveApiPort(port))
+      .catch(console.error);
   }, [useCustomPrompt, customEditPrompt, customAskPrompt, apiPort]);
 
   useEffect(() => {
@@ -305,7 +308,7 @@ function App() {
       gitPath,
       mapTokens,
       outputExtension,
-      apiPort: Number(apiPort),
+      apiPort: activeApiPort,
     });
   };
 
