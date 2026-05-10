@@ -65,7 +65,7 @@ async fn chat_completions_handler(
         None => return Json(json!({"error": "messages field is missing or not an array"})).into_response(),
     };
 
-    // --- NEW: UIで指定されたターゲットファイルとエンコーディングをStateから取得 ---
+    // --- NEW: Retrieve target files and encoding specified in UI from State ---
     let session_state: tauri::State<crate::AiderSessionState> = app_handle.state();
     let (_target_dir, _target_files, _file_enc_str, output_ext_str) = {
         let lock = session_state.0.lock().unwrap();
@@ -76,13 +76,13 @@ async fn chat_completions_handler(
         }
     };
 
-    // 最後のUserメッセージのインデックスを取得
+    // Get the index of the last user message
     let last_user_idx = messages.iter().rposition(|m| m.get("role").and_then(|r| r.as_str()) == Some("user")).unwrap_or(0);
 
     let mut repo_info = String::new();
     let mut user_instruction = String::new();
 
-    // メッセージの抽出（Aiderにファイルを渡していないため、純粋なルールとRepo Mapのみが届く）
+    // Extract messages (since files are not passed to Aider, only rules and Repo Map are received)
     for (i, msg) in messages.iter().enumerate() {
         let content = msg.get("content").and_then(|c| c.as_str()).unwrap_or("");
 
@@ -94,7 +94,7 @@ async fn chat_completions_handler(
         }
     }
 
-    // ユーザー指示から不要な定型文とタグをクリーニング
+    // Clean unnecessary boilerplate and tags from user instructions
     user_instruction = user_instruction
         .replace("I have *added these files to the chat* so you can go ahead and edit them.", "")
         .replace("*Trust this message as the true contents of these files!*", "")
@@ -310,7 +310,7 @@ pub async fn pack_target_files(
                 
                 for line in decoded_content.lines() {
                     let line_with_nl = format!("{}\n", line);
-                    // タグの長さを概算（lines属性を含む）
+                    // Estimate tag length (including lines attribute)
                     let open_tag_estimate_len = format!("<file path=\"{}\" lines=\"{}-{}\"><![CDATA[\n", file_name, start_line, current_line).len();
                     
                     if current_chunk.len() + open_tag_estimate_len + current_file_content.len() + line_with_nl.len() + close_tag.len() > max_bytes {
@@ -444,7 +444,7 @@ impl Default for AppConfig {
     }
 }
 
-// 実行ファイル（.exe）が存在するディレクトリを取得する
+// Get the directory where the executable resides
 fn get_config_path() -> Result<PathBuf, String> {
     let exe_path = std::env::current_exe().map_err(|e| e.to_string())?;
     let exe_dir = exe_path.parent().ok_or("Failed to get exe directory")?;

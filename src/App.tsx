@@ -296,7 +296,7 @@ function App() {
     setIsProcessing(true);
     setRepoMapData(null);
     const activeFilesStr = targetFiles.filter(f => f.included).map(f => f.path).join(" ");
-    // Aiderをクラッシュさせる /ask の代わりに、Rustだけが解釈できる独自タグを付与
+    // Instead of using /ask which causes Aider to crash, use a custom tag that only Rust interprets
     const finalMessage = mode === "ask" ? `[MODE:ASK]\n${instruction}` : instruction;
     await invoke("launch_aider_batch", {
       targetDir,
@@ -326,7 +326,7 @@ function App() {
       // Windows/Mac: Use Tauri native plugin
       e.preventDefault();
       
-      // TS2322エラー回避: iconPath が undefined の場合は処理を中断する
+      // Prevent TS2322 error: Abort if iconPath is undefined
       if (!iconPath) {
         console.error("Drag failed: iconPath is missing.");
         return;

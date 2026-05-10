@@ -62,14 +62,14 @@ pub fn resolve_encoding_labels(input: &str) -> (String, String) {
     let normalized = input.trim().to_lowercase();
     match normalized.as_str() {
         "cp932" | "windows-31j" | "shift_jis" | "sjis" => {
-            // Rust(WHATWG)は windows-31j, Pythonは cp932 を好む
+            // Rust(WHATWG) prefers windows-31j, Python prefers cp932
             ("windows-31j".to_string(), "cp932".to_string())
         },
         "euc-jp" | "euc_jp" => {
             ("euc-jp".to_string(), "euc_jp".to_string())
         },
         _ => {
-            // 未知のものや utf-8 はそのまま両方に渡す
+            // Pass through unknown or utf-8 as-is
             (normalized.clone(), normalized)
         }
     }
@@ -103,8 +103,8 @@ pub fn spawn_aider_process(app_handle: &tauri::AppHandle, target_dir: String, _f
         "dummy",
         "--model",
         "gpt-4o",
-        "--edit-format", // NEW: Aiderのデフォルトフォーマットルールを無効化
-        "ask",           // NEW: ルールを含まないプレーンなプロンプトを生成させる
+        "--edit-format", // NEW: Disable Aider's default formatting rules
+        "ask",           // NEW: Generate plain prompts without rules
         "--no-stream",
         "--no-auto-commits",
         "--yes",
@@ -184,14 +184,14 @@ pub fn spawn_aider_process(app_handle: &tauri::AppHandle, target_dir: String, _f
                 });
             }
             
-            // プロセス終了を監視してイベントを発火
+            // Monitor process termination and emit events
             let app_handle_clone = app_handle.clone();
             std::thread::spawn(move || {
                 let status = child.wait().unwrap();
                 let _ = app_handle_clone.emit("aider_log", format!("--- Operation Finished ({}) ---", status));
                 let _ = app_handle_clone.emit("aider_finished", status.success());
 
-                // 状態からPIDを削除
+                // Remove PID from state
                 let state = app_handle_clone.state::<AiderProcessState>();
                 let mut pids = state.0.lock().unwrap();
                 pids.retain(|&p| p != pid);
@@ -220,11 +220,11 @@ async fn apply_patch(
     
     for (i, line) in lines.iter().enumerate() {
         if line.contains("<<<<<<< SEARCH") {
-            // SEARCH行から上に向かって、空行やマークダウン開始記号(```)ではない行を探す
+            // Search upwards from the SEARCH line for a line that isn't empty or a markdown block start (```)
             for j in (0..i).rev() {
                 let prev_line = lines[j].trim();
                 if !prev_line.is_empty() && !prev_line.starts_with("```") {
-                    // バッククォートやアスタリスク等の装飾を剥がす
+                    // Strip decorations like backticks or asterisks
                     let clean_path = prev_line.trim_matches(|c| c == '`' || c == '*' || c == '"' || c == '\'');
                     target_file_path = Some(clean_path);
                     break;
@@ -234,18 +234,18 @@ async fn apply_patch(
         }
     }
 
-    // デフォルトはOSの仕様に従う（WindowsならCRLF、Mac/LinuxならLF）
+    // Default to OS-specific line endings (CRLF for Windows, LF for Mac/Linux)
     let mut use_crlf = cfg!(windows);
     
     if let Some(rel_path) = target_file_path {
         let full_path = std::path::Path::new(&target_dir).join(rel_path);
         
-        // ファイルが存在すれば実際の改行コードを優先して上書き
+        // If the file exists, prioritize and use its actual line endings
         if let Ok(bytes) = std::fs::read(&full_path) {
             if bytes.windows(2).any(|w| w == b"\r\n") {
                 use_crlf = true;
             } else if bytes.contains(&b'\n') {
-                use_crlf = false; // Unix改行コード(LF)を検出！
+                use_crlf = false; // Unix line ending (LF) detected!
             }
         } else {
             let _ = app_handle.emit("aider_log", format!("=> [PromptProxy] Note: Could not read target file for line-ending detection. Defaulting to OS standard. Path: {:?}", full_path));
@@ -292,14 +292,14 @@ async fn apply_patch(
     command.env("PATH", path_env);
     command.env("PYTHONUTF8", "1");
 
-    // AiderSessionStateから、PromptProxyが待ち受けているローカルポートを取得
+    // Retrieve the local port that PromptProxy is listening on from AiderSessionState
     let api_port = {
         let state_guard = app_handle.state::<crate::AiderSessionState>();
         let lock = state_guard.0.lock().unwrap();
         lock.as_ref().map(|s| s.api_port).unwrap_or(8080)
     };
 
-    // env_removeを使用せず、引数でダミー設定を渡すことで初期化通信をローカルに上書きする
+    // Override initialization communication to local by passing dummy settings in arguments instead of using env_remove
     command.args([
         "--openai-api-base",
         &format!("http://127.0.0.1:{}/v1", api_port),
@@ -312,7 +312,7 @@ async fn apply_patch(
     command.arg("--apply").arg(&patch_file_path);
     command.arg("--yes");
     command.arg("--no-analytics");
-    command.arg("--no-auto-commits"); // 追加: パッチ適用後の自動コミットとAPI通信を遮断
+    command.arg("--no-auto-commits"); // Add: Block auto-commits and API communication after patch application
     command.arg("--no-show-release-notes");
     command.arg("--no-check-update");
 
@@ -330,7 +330,7 @@ async fn apply_patch(
             let state = app_handle.state::<crate::AiderProcessState>();
             state.0.lock().unwrap().push(pid);
 
-            if let Some(stdout) = child.stdout.take() { /* 既存のstdoutスレッド */
+            if let Some(stdout) = child.stdout.take() { /* Existing stdout thread */
                 let app_handle_clone = app_handle_clone.clone();
                 std::thread::spawn(move || {
                     use std::io::BufRead;
@@ -344,7 +344,7 @@ async fn apply_patch(
                     }
                 });
             }
-            if let Some(stderr) = child.stderr.take() { /* 既存のstderrスレッド */
+            if let Some(stderr) = child.stderr.take() { /* Existing stderr thread */
                 let app_handle_clone = app_handle_clone.clone();
                 std::thread::spawn(move || {
                     use std::io::BufRead;
@@ -359,7 +359,7 @@ async fn apply_patch(
                 });
             }
 
-            // プロセス終了監視
+            // Monitor process termination
             let app_handle_clone = app_handle.clone();
             std::thread::spawn(move || {
                 let status = child.wait().unwrap();
