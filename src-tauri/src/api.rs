@@ -115,12 +115,8 @@ async fn chat_completions_handler(
         repo_info.trim()
     );
 
-    let temp_dir = match app_handle.path().temp_dir() {
-        Ok(path) => path,
-        Err(_) => {
-            return Json(json!({"error": "Could not resolve temp directory"})).into_response()
-        }
-    };
+    let temp_dir = std::env::temp_dir().join(format!("prompt_proxy_{}", std::process::id()));
+    let _ = std::fs::create_dir_all(&temp_dir);
 
     let payload_str = serde_json::to_string_pretty(&payload).unwrap();
     let json_path = temp_dir.join("aider_payload.json");
@@ -273,7 +269,8 @@ pub async fn pack_target_files(
     
     let flush_chunk = |chunk: &mut String, index: &mut usize, paths: &mut Vec<String>| -> Result<(), String> {
         if chunk.len() > header.len() {
-            let temp_dir = std::env::temp_dir();
+            let temp_dir = std::env::temp_dir().join(format!("prompt_proxy_{}", std::process::id()));
+            let _ = std::fs::create_dir_all(&temp_dir);
             let temp_path = temp_dir.join(format!("target_files_{}.{}", index, ext_clean));
             std::fs::write(&temp_path, &chunk).map_err(|e| e.to_string())?;
             let abs_out = std::fs::canonicalize(&temp_path).unwrap_or(temp_path);
@@ -361,7 +358,7 @@ pub async fn update_prompt_settings(
     println!("=> [PromptProxy] Settings updated: {:?}", settings);
     let mut current_settings = state.prompt_settings.lock().await;
     *current_settings = settings;
-    Ok(())
+    Ok(bound_port)
 }
 
 #[tauri::command]
@@ -369,7 +366,7 @@ pub async fn start_api_server(
     port: u16,
     state: tauri::State<'_, AppState>,
     app_handle: tauri::AppHandle,
-) -> Result<(), String> {
+) -> Result<u16, String> {
     let mut server_tx = state.server_tx.lock().await;
     if let Some(tx) = server_tx.take() {
         let _ = tx.send(());
@@ -389,16 +386,16 @@ pub async fn start_api_server(
         .with_state(app_handle.clone())
         .layer(cors);
 
-    let addr = format!("127.0.0.1:{}", port);
+    let mut addr = format!("127.0.0.1:{}", port);
     let listener = match tokio::net::TcpListener::bind(&addr).await {
         Ok(l) => l,
-        Err(e) => {
-            let err_msg = format!("Failed to bind to port {}: {}", port, e);
-            eprintln!("{}", err_msg);
-            return Err(err_msg);
+        Err(_) => {
+            addr = "127.0.0.1:0".to_string();
+            tokio::net::TcpListener::bind(&addr).await.map_err(|e| e.to_string())?
         }
     };
-    println!("API server listening on {}", addr);
+    let bound_port = listener.local_addr().unwrap().port();
+    println!("API server listening on 127.0.0.1:{}", bound_port);
 
     tauri::async_runtime::spawn(async move {
         axum::serve(listener, app)
