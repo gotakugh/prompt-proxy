@@ -8,10 +8,11 @@ import "./App.css";
 const DEFAULT_EDIT_PROMPT = "Read the attached context.xml, understand the context, and modify the code according to the instructions below.\n\n" +
   "=== Instructions ===\n{instruction}\n================\n\n" +
   "🚨 [CRITICAL FORMATTING RULES] 🚨\n" +
-  "1. Output ALL your modifications within a SINGLE markdown code block (` ```text ` or ` ``` `). Do NOT split them into multiple blocks.\n" +
-  "2. You MUST write the exact 'target file path' on a single line immediately before EVERY `<<<<<<< SEARCH` marker. If you modify the same file multiple times, repeat the file path before each block.\n" +
-  "3. The `<<<<<<< SEARCH` block MUST contain the EXACT original lines from the file. DO NOT abbreviate, DO NOT use placeholders like `// old code...`. It must be a perfect line-for-line match, including indentation.\n" +
-  "4. Keep the SEARCH blocks reasonably short (a few lines of context) but unique enough to find the correct location.\n\n" +
+  "1. You MUST start your response with a brief summary of your changes wrapped in <summary> tags. (e.g., <summary>Fixed bug in App.tsx</summary>)\n" +
+  "2. Output ALL your modifications within a SINGLE markdown code block (` ```text ` or ` ``` `) immediately after the summary. Do NOT split them into multiple blocks.\n" +
+  "3. You MUST write the exact 'target file path' on a single line immediately before EVERY `<<<<<<< SEARCH` marker. If you modify the same file multiple times, repeat the file path before each block.\n" +
+  "4. The `<<<<<<< SEARCH` block MUST contain the EXACT original lines from the file. DO NOT abbreviate, DO NOT use placeholders like `// old code...`. It must be a perfect line-for-line match, including indentation.\n" +
+  "5. Keep the SEARCH blocks reasonably short (a few lines of context) but unique enough to find the correct location.\n\n" +
   "Example Output Format:\n" +
   "```text\n" +
   "src/App.tsx\n" +
@@ -64,6 +65,8 @@ function App() {
   const [maxFileSizeKb, setMaxFileSizeKb] = useState("80");
   const [packedFiles, setPackedFiles] = useState<{path: string, size_kb: number}[]>([]);
   const [aiResponse, setAiResponse] = useState("");
+  const [commitMessage, setCommitMessage] = useState("");
+  const [patchStatus, setPatchStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [logs, setLogs] = useState<string[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -170,8 +173,9 @@ function App() {
       setLogs(prev => [...prev, event.payload]);
     });
 
-    const unlistenFinished = listen<boolean>("aider_finished", () => {
+    const unlistenFinished = listen<boolean>("aider_finished", (event) => {
       setIsProcessing(false);
+      setPatchStatus(event.payload ? 'success' : 'error');
     });
 
     return () => {
@@ -228,9 +232,21 @@ function App() {
     setTargetFiles([]);
     setPackedFiles([]);
     setAiResponse("");
+    setCommitMessage("");
+    setPatchStatus('idle');
+  };
+
+  const handleAiResponseChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const val = e.target.value;
+    setAiResponse(val);
+    const summaryMatch = val.match(/<summary>([\s\S]*?)<\/summary>/);
+    if (summaryMatch && summaryMatch[1]) {
+      setCommitMessage(summaryMatch[1].trim());
+    }
   };
 
   const handleApplyPatch = async () => {
+    setPatchStatus('idle');
     setIsProcessing(true);
     setLogs(prev => [...prev, `--- PromptProxy: Applying patch via Aider [${new Date().toLocaleTimeString()}] ---`]);
     await invoke("apply_patch", {
@@ -556,11 +572,30 @@ function App() {
             
             {activeTab === 'C' && (
               <div className="card">
+                  {patchStatus === 'success' && (
+                    <div style={{ padding: '0.8em', marginBottom: '1em', borderRadius: '6px', backgroundColor: '#d4edda', color: '#155724', border: '1px solid #c3e6cb' }}>
+                      ✅ Patch applied successfully!
+                    </div>
+                  )}
+                  {patchStatus === 'error' && (
+                    <div style={{ padding: '0.8em', marginBottom: '1em', borderRadius: '6px', backgroundColor: '#f8d7da', color: '#721c24', border: '1px solid #f5c6cb' }}>
+                      ❌ Patch application failed or partially failed. Check logs.
+                    </div>
+                  )}
+                  <div className="form-group">
+                      <label>Commit Message (Summary)</label>
+                      <textarea 
+                        value={commitMessage} 
+                        onChange={(e) => setCommitMessage(e.target.value)} 
+                        placeholder="Briefly summarize your changes..."
+                        style={{ height: '80px', minHeight: '80px' }}
+                      />
+                  </div>
                   <div className="form-group">
                       <label>AI Response (SEARCH/REPLACE Blocks)</label>
                       <textarea 
                         value={aiResponse} 
-                        onChange={(e) => setAiResponse(e.target.value)} 
+                        onChange={handleAiResponseChange} 
                         placeholder="Paste the full response from your Web LLM here..."
                       />
                   </div>
