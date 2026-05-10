@@ -334,7 +334,7 @@ function App() {
 
       try {
         await startDrag({
-          item: filePaths, // 配列をそのまま渡す
+          item: filePaths, // Pass the array as-is
           icon: iconPath,
         });
       } catch (error) {
