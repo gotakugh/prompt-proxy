@@ -1,8 +1,6 @@
 mod api;
-use std::process::{Child, Command, Stdio};
+use std::process::{Command, Stdio};
 use std::sync::Mutex;
-use std::thread;
-use std::time::Duration;
 use tauri::{Emitter, Manager};
 
 pub struct AiderProcessState(pub Mutex<Vec<u32>>);

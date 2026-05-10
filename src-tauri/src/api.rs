@@ -358,7 +358,7 @@ pub async fn update_prompt_settings(
     println!("=> [PromptProxy] Settings updated: {:?}", settings);
     let mut current_settings = state.prompt_settings.lock().await;
     *current_settings = settings;
-    Ok(bound_port)
+    Ok(())
 }
 
 #[tauri::command]
@@ -407,7 +407,7 @@ pub async fn start_api_server(
             .unwrap();
     });
 
-    Ok(())
+    Ok(bound_port)
 }
 
 use serde::{Deserialize, Serialize};
