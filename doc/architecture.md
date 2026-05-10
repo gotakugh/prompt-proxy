@@ -1,83 +1,79 @@
-# PromptProxy 総合仕様書
+# PromptProxy General Specifications
 
-## 1. システム概要
+## 1. System Overview
 
-### 1.1 目的
-PromptProxyは、強力なローカルAIコーディングツールである「Aider」と、ブラウザ上の強力なLLM（Gemini 1.5 ProやClaude 3.5 Sonnet等のWeb UI）をシームレスに中継（プロキシ）するためのGUIアプリケーションです。
-Aiderの高度なリポジトリ解析能力とパッチ適用機能を利用しつつ、AIとの対話やソースコードの受け渡しはすべてRust/Tauriを介して行い、Web AIの巨大なコンテキストウィンドウをローカル開発環境に統合することを目的としています。
+### 1.1 Purpose
+PromptProxy is a GUI application designed to seamlessly bridge (proxy) "Aider," a powerful local AI coding tool, with advanced LLMs available through web interfaces (e.g., Gemini 1.5 Pro, Claude 3.5 Sonnet). By leveraging Aider's sophisticated repository analysis and patching capabilities while handling all AI interaction and source code transfer via Rust/Tauri, it aims to integrate the massive context windows of Web LLMs into local development environments.
 
-### 1.2 主な特徴
-* **完全なモジュラー設計**: RepoMap生成、対象ファイルのXML化、パッチ適用の3つの機能が独立して動作し、インクリメンタルな文脈構築が可能です。
-* **ハイブリッド・コンテキスト生成**: Aiderにはファイル実体を渡さずプロジェクト構造の解析（Repo Map）のみを任せ、巨大なソースコードの実体はRustが直接ディスクから読み込んでXML化します。
-* **アップロード制限の回避**: 厳しいファイルサイズ制限を持つWeb LLM向けに、ファイルを安全なサイズ（KB単位）かつ行単位で自動分割し、複数ファイルとして一括ドラッグ＆ドロップできる機能を備えています。
-* **ポータブル・アプリケーション**: すべての設定は実行ファイル（`.exe`）と同階層の `config.json` に保存され、USBメモリ等での持ち運びや環境移行が容易です。
-
----
-
-## 2. システムアーキテクチャ
-
-本システムは Tauri (Rust) + React (TypeScript) で構成されています。
-
-### 2.1 フロントエンド (View層)
-* **技術**: React, TypeScript, CSS (Vanilla)
-* **役割**: ユーザーからの指示入力、設定（Global Settings）の管理、OSへのドラッグ＆ドロップ（単一/複数）の提供、AIからの返答入力UI、およびAiderプロセスの標準出力のリアルタイム表示を行います。
-
-### 2.2 バックエンド (Controller/Proxy層)
-* **技術**: Rust, Tauri, Axum (Webサーバー), Tokio (非同期処理)
-* **役割**:
-  * `localhost:8080` 等にてOpenAI互換のモックAPIサーバー (`/v1/chat/completions`) を稼働。
-  * Aiderの子プロセス管理（起動、引数構築、標準出力パイプ、Graceful Shutdown）。
-  * AiderからのAPIリクエストの横取りと、純粋なプロンプトへの変換。
-  * ローカルファイルシステムの高速アクセスとチャンク分割XMLパッキング。
-  * パッチ適用時のAider外部通信（アップデートチェックやモデル初期化）の完全な物理遮断（オフライン化）。
+### 1.2 Key Features
+* **Fully Modular Design**: Three independent blocks (Repo Map Generation, Target File XML Packing, and Patch Application) allow for an incremental context-building workflow.
+* **Hybrid Context Generation**: Aider is tasked only with analyzing the project structure (Repo Map) without being passed file contents. Instead, Rust directly reads and packs large source code files into XML format.
+* **Bypassing Upload Limits**: For Web LLMs with strict file size limits, the tool automatically splits files into safe chunks (configurable in KB) by line, enabling them to be dragged and dropped as multiple files simultaneously.
+* **Portable Application**: All settings are saved in `config.json` within the same directory as the executable, making it easy to carry on a USB drive or migrate between environments.
 
 ---
 
-## 3. 画面構成とUI仕様 (モジュラー型ワークフロー)
+## 2. System Architecture
 
-アプリは状態遷移によるロックダウン（グレーアウト）を廃止し、ユーザーがいつでも好きな順番で機能を使用できる3つの独立したブロックで構成されています。
+The system is built using Tauri (Rust) + React (TypeScript).
 
-### 3.1 画面レイアウト
-1. **上部ヘッダー**: 各機能のステップ表示と、プロセス強制初期化用の「🔄 Reload」ボタン。
-2. **中央メイン領域**: グローバル設定と、3つの独立した機能ブロック（A, B, C）。
-3. **下部ターミナル領域**: アプリの動作ログおよびAiderプロセスの標準出力を常時表示する黒いターミナル。
+### 2.1 Frontend (View Layer)
+* **Technology**: React, TypeScript, Vanilla CSS
+* **Role**: Handles user input for instructions, manages Global Settings, provides single/multiple file drag-and-drop functionality to the OS, provides a UI for AI responses, and displays real-time stdout logs from the Aider process.
 
-### 3.2 独立した3つの機能ブロック
+### 2.2 Backend (Controller/Proxy Layer)
+* **Technology**: Rust, Tauri, Axum (Web Server), Tokio (Async)
+* **Role**:
+  * Runs an OpenAI-compatible mock API server (`/v1/chat/completions`) at `localhost:8080` (or a dynamic port).
+  * Manages the Aider child process (launching, argument construction, piping stdout, graceful shutdown).
+  * Intercepts API requests from Aider and converts them into pure prompts for the user.
+  * Provides high-speed local file system access and chunked XML packing.
+  * Completely isolates Aider from the network during patch application (offline mode) to prevent external checks or model initializations.
+
+---
+
+## 3. UI Composition and Specifications (Modular Workflow)
+
+The app avoids restrictive state lockdowns. Users can use any of the three independent functional blocks in any order.
+
+### 3.1 Screen Layout
+1. **Top Header**: Step indicators and a "🔄 Reload" button for forcing process re-initialization.
+2. **Center Main Area**: Global settings and three independent functional blocks (A, B, and C).
+3. **Bottom Terminal Area**: A persistent black terminal displaying app logs and the Aider process output.
+
+### 3.2 Three Independent Functional Blocks
 * **[Block A] Generate Repo Map & Prompt**: 
-  Aiderを使用してプロジェクトの全体構造（Repo Map）と、AIへの厳格な出力ルールを生成します。
+  Uses Aider to generate the overall project structure (Repo Map) along with strict output rules for the AI.
 * **[Block B] Pack Target Files to XML**: 
-  指定された複数のファイルをRustが直接読み込み、Web LLMに渡すためのXMLファイルとして出力します。
+  Rust reads the specified files directly and outputs them as XML files to be passed to the Web LLM.
 * **[Block C] Apply Patch**: 
-  Web UIからコピーしたAIのコード出力（SEARCH/REPLACEブロック）を貼り付け、ローカルファイルに適用します。
+  Accepts AI-generated code output (SEARCH/REPLACE blocks) copied from the Web UI and applies it to local files.
 
-### 3.3 設定管理
-* **Global Settings**: 対象ディレクトリ、ファイルエンコーディング、分割最大サイズ（KB）、Map Tokens、出力拡張子（`.xml`, `.txt` 等）をメイン画面から設定可能。
-* **Prompt Settings**: ⚙️ Settingsメニューから、Aider実行パス、APIポート、操作言語、および独自のカスタムプロンプト（Edit/Ask用）を設定できます。
-すべての設定はアプリ起動時に `config.json` から読み込まれ、変更時に即座に保存されます。
+### 3.3 Configuration Management
+* **Global Settings**: Target directory, file encoding, max chunk size (KB), Map Tokens, and output extension (e.g., `.xml`, `.txt`) can be set from the main screen.
+* **Prompt Settings**: From the ⚙️ Settings menu, users can configure the Aider path, API port, chat language, and custom prompts (for Edit/Ask modes).
+All settings are loaded from `config.json` at startup and saved immediately upon change.
 
 ---
 
-## 4. 主要機能・コアルール仕様
+## 4. Core Features and Rules
 
-### 4.1 Aiderプロンプト無効化と厳格な単一ブロック強制
-Aider本来の複雑なシステムプロンプトを無効化（`--edit-format ask`）し、PromptProxy独自のプロンプトでLLMに指示を出します。
-パッチのコピー＆ペーストを容易にするため、LLMには**「すべてのファイル変更を単一のコードブロック内に収め、各 SEARCH/REPLACE マーカーの直前にファイル名を記述する」**よう強制します。
+### 4.1 Disabling Aider Prompts and Enforcing Single Code Blocks
+Aider's complex native system prompts are disabled (`--edit-format ask`), replaced by PromptProxy's own strict instructions. To facilitate easy copy-pasting, the LLM is instructed to **"wrap all file changes within a single code block, with the file path written on the line immediately preceding each SEARCH/REPLACE marker."**
 
-### 4.2 巨大ファイルの安全な行単位分割（Chunking）
-Web LLMのアップロード制限を回避するため、Target Filesをパッキングする際、指定されたサイズ（例：80KB）を超えないようにファイルを安全に行単位で分割します。
-分割されたXMLの各タグには `<file path="src/main.rs" lines="1-850">` のように行番号属性が付与され、LLMが文脈を見失う（ハルシネーションを起こす）のを防ぎます。
+### 4.2 Safe Line-Based File Splitting (Chunking)
+To avoid upload restrictions of Web LLMs, Target Files are split into chunks based on a specified size limit (e.g., 80KB). Each tag in the XML includes line number attributes (e.g., `<file path="src/main.rs" lines="1-850">`) to prevent the LLM from losing context or hallucinating.
 
-### 4.3 OS非依存の「一括」ドラッグ＆ドロップ機能
-複数のチャンクに分割されたファイル群を、1つの「Drag All」アイコンから一度にブラウザへドロップ可能です。
-* **Linux環境 (Wayland/X11)**: `text/uri-list` 形式を用いたネイティブな複数ファイルプロトコルを利用。
-* **Mac/Windows環境**: Tauriネイティブプラグインを使用し、OSのドラッグイベントとして処理。
+### 4.3 OS-Agnostic Bulk Drag-and-Drop
+Multiple file chunks can be dropped into a browser at once via a single "Drag All" icon.
+* **Linux (Wayland/X11)**: Uses the native `text/uri-list` protocol for multiple files.
+* **Mac/Windows**: Handled as OS drag events via the Tauri native plugin.
 
-### 4.4 完全オフラインでのパッチ適用と改行コード保護
-パッチ適用（Block C）時は、Aiderのモデル初期化による外部通信（openrouter.ai等）を防ぐため、内部でダミーのAPI設定とローカルポートへのリダイレクトを行い、**完全なオフライン状態**で処理を完結させます。
-また、パッチ適用時にファイルの改行コードを自動判定し、Windows環境であっても元のファイルがLFであればLFを維持し、意図しないCRLFの混入を防ぎます。
+### 4.4 Offline Patching and Line Ending Protection
+During patch application (Block C), internal API settings are redirected to the local port to prevent Aider from communicating externally (e.g., with openrouter.ai). This ensures a **completely offline** process. Additionally, the tool automatically detects the original file's line endings (LF vs. CRLF) and preserves them to prevent unintended changes.
 
-### 4.5 Aiderプロセスの安全な終了 (Graceful Shutdown)
-アプリを閉じる際、Aiderプロセスがゾンビ化してGitロック等が残らないよう、以下の手順で終了します。
-1. プロセスIDに対して `SIGINT` (Ctrl+C 相当) を送信。
-2. 最大2秒間、プロセスの正常終了をポーリング待機。
-3. タイムアウトした場合は `SIGKILL` で強制終了。
+### 4.5 Graceful Shutdown of Aider Processes
+To prevent zombie processes and Git lock issues, the app follows these steps when closing:
+1. Sends a `SIGINT` (equivalent to Ctrl+C) to the process ID.
+2. Polls for a clean exit for up to 2 seconds.
+3. If it times out, it terminates the process with `SIGKILL`.
