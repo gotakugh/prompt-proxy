@@ -49,7 +49,8 @@ function App() {
   const [activeTab, setActiveTab] = useState("A");
   const [mode, setMode] = useState<"edit" | "ask">("edit");
   const [targetDir, setTargetDir] = useState("");
-  const [files, setFiles] = useState("");
+  const [targetFiles, setTargetFiles] = useState<{path: string, included: boolean}[]>([]);
+  const [fileInput, setFileInput] = useState("");
   const [instruction, setInstruction] = useState("");
   const [fileEncoding, setFileEncoding] = useState("");
   const [mapTokens, setMapTokens] = useState("");
@@ -213,6 +214,7 @@ function App() {
     setIsProcessing(false);
     await invoke("reset_aider_state");
     setRepoMapData(null);
+    setTargetFiles([]);
     setPackedFilesPaths([]);
     setAiResponse("");
   };
@@ -231,11 +233,12 @@ function App() {
   };
 
   const handlePackFiles = async () => {
+    const activeFilesStr = targetFiles.filter(f => f.included).map(f => f.path).join(" ");
     setLogs(prev => [...prev, `--- PromptProxy: Packing target files... [${new Date().toLocaleTimeString()}] ---`]);
     try {
       const paths = await invoke<string[]>("pack_target_files", {
         targetDir,
-        files,
+        files: activeFilesStr,
         fileEncoding,
         maxFileSizeKb: Number(maxFileSizeKb) || 0,
         outputExtension,
@@ -261,11 +264,12 @@ function App() {
   const handleLaunchAider = async () => {
     setIsProcessing(true);
     setRepoMapData(null);
+    const activeFilesStr = targetFiles.filter(f => f.included).map(f => f.path).join(" ");
     // Aiderをクラッシュさせる /ask の代わりに、Rustだけが解釈できる独自タグを付与
     const finalMessage = mode === "ask" ? `[MODE:ASK]\n${instruction}` : instruction;
     await invoke("launch_aider_batch", {
       targetDir,
-      files,
+      files: activeFilesStr,
       message: finalMessage,
       chatLanguage,
       aiderPath,
@@ -449,10 +453,68 @@ function App() {
             {activeTab === 'B' && (
               <div className="card">
                   <div className="form-group">
-                      <label>Target Files (Space-separated)</label>
-                      <input type="text" value={files} onChange={(e) => setFiles(e.target.value)} placeholder="src/main.rs src/lib.rs"/>
+                      <label>Add Target Files (Space-separated, Press Enter)</label>
+                      <div className="input-group">
+                        <input
+                          type="text"
+                          value={fileInput}
+                          onChange={(e) => setFileInput(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" && fileInput.trim()) {
+                              const newPaths = fileInput.split(/\s+/).filter(p => p && !targetFiles.some(tf => tf.path === p));
+                              if (newPaths.length > 0) {
+                                setTargetFiles([...targetFiles, ...newPaths.map(p => ({ path: p, included: true }))]);
+                              }
+                              setFileInput("");
+                            }
+                          }}
+                          placeholder="src/main.rs src/lib.rs"
+                        />
+                        <button onClick={() => setTargetFiles([])} className="reset-button">Clear All</button>
+                      </div>
                   </div>
-                  <button onClick={handlePackFiles}>Pack Files</button>
+
+                  <div style={{ maxHeight: '200px', overflowY: 'auto', marginBottom: '1em', border: '1px solid #ccc', borderRadius: '6px', padding: '0.5em', backgroundColor: 'rgba(0,0,0,0.02)' }}>
+                    {targetFiles.length === 0 && <div style={{ color: '#888', fontSize: '0.9em', textAlign: 'center', padding: '1em' }}>No files added</div>}
+                    {targetFiles.map((file, idx) => (
+                      <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '0.5em', marginBottom: '4px' }}>
+                        <input
+                          type="checkbox"
+                          checked={file.included}
+                          onChange={(e) => {
+                            const newFiles = [...targetFiles];
+                            newFiles[idx].included = e.target.checked;
+                            setTargetFiles(newFiles);
+                          }}
+                          style={{ width: 'auto', boxShadow: 'none' }}
+                        />
+                        <span style={{
+                          flex: 1,
+                          fontSize: '0.9em',
+                          color: file.included ? 'inherit' : '#888',
+                          textDecoration: file.included ? 'none' : 'line-through',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap'
+                        }}>
+                          {file.path}
+                        </span>
+                        <button
+                          onClick={() => setTargetFiles(targetFiles.filter((_, i) => i !== idx))}
+                          style={{ padding: '0px 6px', fontSize: '0.8em', minWidth: 'auto', boxShadow: 'none' }}
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+
+                  <button
+                    onClick={handlePackFiles}
+                    disabled={targetFiles.filter(f => f.included).length === 0}
+                  >
+                    Pack Files ({targetFiles.filter(f => f.included).length} selected)
+                  </button>
                   {packedFilesPaths.length > 0 && repoMapData?.icon_file_path && (
                     <div className="info-box" style={{marginTop: '1em'}}>
                         <h4>Packed Files</h4>

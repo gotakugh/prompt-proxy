@@ -98,8 +98,8 @@ input,
 button {
   border-radius: 8px;
   border: 1px solid transparent;
-  padding: 0.6em 1.2em;
-  font-size: 1em;
+  padding: 0.4em 0.8em;
+  font-size: 0.95em;
   font-weight: 500;
   font-family: inherit;
   color: #0f0f0f;
@@ -190,7 +190,7 @@ button {
 }
 .main-content {
   flex: 1;
-  padding: 1em 1.5em; /* 余白を削減 */
+  padding: 0.5em 1em;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
@@ -198,8 +198,8 @@ button {
 /* --- Terminal / Log Area Styles --- */
 .bottom-terminal {
   flex-shrink: 0;
-  height: 35%;
-  min-height: 250px;
+  height: 25%;
+  min-height: 180px;
   background-color: #1e1e1e;
   border-top: 2px solid #333;
   display: flex;
@@ -264,8 +264,8 @@ button {
 
 .card {
   max-width: 100%; /* 幅の制限を解除して領域を有効活用 */
-  margin: 0 0 1em 0; /* マージンを削減 */
-  padding: 1.2em 1.5em; /* パディングを削減 */
+  margin: 0 0 0.8em 0;
+  padding: 0.8em 1.2em;
   text-align: left;
   background-color: rgba(0, 0, 0, 0.03);
   border-radius: 6px;
@@ -303,8 +303,8 @@ button {
 .form-group {
   display: flex;
   flex-direction: column;
-  margin-bottom: 0.8em; /* マージンを削減 */
-  gap: 0.3em; /* ギャップを削減 */
+  margin-bottom: 0.5em;
+  gap: 0.2em;
 }
 
 .form-group label {
@@ -463,8 +463,8 @@ textarea {
   box-sizing: border-box;
   border-radius: 8px;
   border: 1px solid #ccc;
-  padding: 0.8em;
-  font-size: 1em;
+  padding: 0.4em 0.8em;
+  font-size: 0.95em;
   font-family: inherit;
   background-color: #ffffff;
   color: #0f0f0f;
