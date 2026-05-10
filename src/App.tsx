@@ -22,7 +22,8 @@ const DEFAULT_EDIT_PROMPT = "Read the attached context.xml, understand the conte
   "    const [activeTab, setActiveTab] = useState(\"B\");\n" +
   ">>>>>>> REPLACE\n" +
   "```\n\n" +
-  "5. ONLY if you determine that necessary files are missing from context.xml, do NOT output the code modification block. Instead, output the missing file paths in a single code block and ask the user to add them.";
+  "5. ONLY if you determine that necessary files are missing from context.xml, do NOT output the code modification block. Instead, output the missing file paths in a single code block and ask the user to add them.\n" +
+  "6. If your changes are massive and might hit the output token limit, finish the current file's REPLACE block cleanly, close the code block, and ask the user to say 'continue' for the rest.";
 
 const DEFAULT_ASK_PROMPT = "Read the attached context.xml, understand the repository context, and answer the following question.\n\n=== Question ===\n{instruction}\n==============\n\n[IMPORTANT]\nIf you determine that necessary files are missing from context.xml to answer the question, please tell the user which files are missing. Output the missing file paths in a single markdown code block (so the user can easily copy them), and ask the user to add them to the 'Target Files' input and run again.";
 
