@@ -14,6 +14,12 @@ pub struct PromptSettings {
     pub custom_ask_prompt: String,
 }
 
+#[derive(serde::Serialize)]
+pub struct PackedFile {
+    pub path: String,
+    pub size_kb: f64,
+}
+
 // OpenAI-compatible response structures
 #[derive(serde::Serialize)]
 struct OpenAIChatCompletion {
@@ -253,7 +259,7 @@ pub async fn pack_target_files(
     max_file_size_kb: usize,
     output_extension: String,
     app_handle: tauri::AppHandle,
-) -> Result<Vec<String>, String> {
+) -> Result<Vec<PackedFile>, String> {
     let header = "I have *added these files to the chat* so you can go ahead and edit them.\n\
                   *Trust this message as the true contents of these files!*\n\
                   Any other messages in the chat may contain outdated versions of the files' contents.\n\n";
@@ -262,19 +268,23 @@ pub async fn pack_target_files(
     
     let mut current_chunk = header.to_string();
     let mut chunk_index = 1;
-    let mut output_paths = Vec::new();
+    let mut output_paths: Vec<PackedFile> = Vec::new();
 
     let ext_clean = output_extension.trim().trim_start_matches('.');
     let ext_clean = if ext_clean.is_empty() { "xml" } else { ext_clean };
     
-    let flush_chunk = |chunk: &mut String, index: &mut usize, paths: &mut Vec<String>| -> Result<(), String> {
+    let flush_chunk = |chunk: &mut String, index: &mut usize, paths: &mut Vec<PackedFile>| -> Result<(), String> {
         if chunk.len() > header.len() {
             let temp_dir = std::env::temp_dir().join(format!("prompt_proxy_{}", std::process::id()));
             let _ = std::fs::create_dir_all(&temp_dir);
             let temp_path = temp_dir.join(format!("target_files_{}.{}", index, ext_clean));
             std::fs::write(&temp_path, &chunk).map_err(|e| e.to_string())?;
             let abs_out = std::fs::canonicalize(&temp_path).unwrap_or(temp_path);
-            paths.push(abs_out.to_string_lossy().replace("\\\\?\\", ""));
+            let size_kb = std::fs::metadata(&temp_path).map(|m| m.len() as f64 / 1024.0).unwrap_or(0.0);
+            paths.push(PackedFile {
+                path: abs_out.to_string_lossy().replace("\\\\?\\", ""),
+                size_kb,
+            });
             
             *index += 1;
             *chunk = header.to_string();

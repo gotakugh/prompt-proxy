@@ -550,19 +550,19 @@ function App() {
                   >
                     Pack Files ({targetFiles.filter(f => f.included).length} selected)
                   </button>
-                  {packedFiles.length > 0 && repoMapData?.icon_file_path && (
+                  {packedFiles.length > 0 && (
                     <div className="info-box" style={{marginTop: '1em'}}>
                         <h4>Packed Files</h4>
                         <div className="draggable-file-wrapper" style={{ flexWrap: 'wrap' }}>
                             {packedFiles.length > 1 && (
-                                <div className="draggable-file" style={{ backgroundColor: 'rgba(57, 108, 216, 0.1)', borderColor: '#396cd8' }} draggable={true} onDragStart={(e) => handleDragFile(e, packedFiles.map(f => f.path), repoMapData.icon_file_path!)}>
+                                <div className="draggable-file" style={{ backgroundColor: 'rgba(57, 108, 216, 0.1)', borderColor: '#396cd8' }} draggable={true} onDragStart={(e) => handleDragFile(e, packedFiles.map(f => f.path), repoMapData?.icon_file_path || "")}>
                                     <svg width="64" height="80" viewBox="0 0 100 120"><path d="M0 4C0 1.8 1.8 0 4 0H65L100 35V116C100 118.2 98.2 120 96 120H4C1.8 120 0 118.2 0 116V4Z" fill="#396CD8"/><path d="M65 0V31C65 33.2 66.8 35 69 35H100L65 0Z" fill="#2952A3"/><text x="50" y="78" fill="white" fontSize="24" fontFamily="monospace" textAnchor="middle" fontWeight="bold">ALL</text></svg>
                                     <span className="file-name" style={{ fontWeight: 'bold', color: '#396cd8' }}>Drag All ({packedFiles.length})</span>
                                     <div style={{ fontSize: '0.8em', color: '#666' }}>{packedFiles.reduce((sum, f) => sum + f.size_kb, 0).toFixed(1)} KB</div>
                                 </div>
                             )}
                             {packedFiles.map((file, index) => (
-                                <div key={index} className="draggable-file" draggable={true} onDragStart={(e) => handleDragFile(e, [file.path], repoMapData.icon_file_path!)}>
+                                <div key={index} className="draggable-file" draggable={true} onDragStart={(e) => handleDragFile(e, [file.path], repoMapData?.icon_file_path || "")}>
                                     <svg width="64" height="80" viewBox="0 0 100 120"><path d="M0 4C0 1.8 1.8 0 4 0H65L100 35V116C100 118.2 98.2 120 96 120H4C1.8 120 0 118.2 0 116V4Z" fill="#84A1E1"/><path d="M65 0V31C65 33.2 66.8 35 69 35H100L65 0Z" fill="#637BC8"/><text x="50" y="78" fill="white" fontSize="36" fontFamily="monospace" textAnchor="middle" fontWeight="bold">&lt;/&gt;</text></svg>
                                     <span className="file-name">target_files_{index + 1}.{displayExt}</span>
                                     <div style={{ fontSize: '0.8em', color: '#666' }}>{file.size_kb.toFixed(1)} KB</div>
