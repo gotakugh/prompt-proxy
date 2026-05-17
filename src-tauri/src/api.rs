@@ -279,7 +279,7 @@ pub async fn pack_target_files(
             let _ = std::fs::create_dir_all(&temp_dir);
             let temp_path = temp_dir.join(format!("target_files_{}.{}", index, ext_clean));
             std::fs::write(&temp_path, &chunk).map_err(|e| e.to_string())?;
-            let abs_out = std::fs::canonicalize(&temp_path).unwrap_or(temp_path);
+            let abs_out = std::fs::canonicalize(&temp_path).unwrap_or(temp_path.clone());
             let size_kb = std::fs::metadata(&temp_path).map(|m| m.len() as f64 / 1024.0).unwrap_or(0.0);
             paths.push(PackedFile {
                 path: abs_out.to_string_lossy().replace("\\\\?\\", ""),
