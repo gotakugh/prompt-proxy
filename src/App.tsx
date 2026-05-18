@@ -8,12 +8,13 @@ import "./App.css";
 const DEFAULT_EDIT_PROMPT = "Read the attached context.xml, understand the context, and modify the code according to the instructions below.\n\n" +
   "=== Instructions ===\n{instruction}\n================\n\n" +
   "🚨 [CRITICAL FORMATTING RULES] 🚨\n" +
-  "1. You MUST start your response with a brief summary of your changes wrapped in <summary> tags. (e.g., <summary>Fixed bug in App.tsx</summary>)\n" +
+  "1. Start your response with a brief summary of your changes in plain text (suitable for a commit message).\n" +
   "2. Output ALL your modifications within a SINGLE markdown code block (` ```text ` or ` ``` `) immediately after the summary. Do NOT split them into multiple blocks.\n" +
   "3. You MUST write the exact 'target file path' on a single line immediately before EVERY `<<<<<<< SEARCH` marker. If you modify the same file multiple times, repeat the file path before each block.\n" +
   "4. The `<<<<<<< SEARCH` block MUST contain the EXACT original lines from the file. DO NOT abbreviate, DO NOT use placeholders like `// old code...`. It must be a perfect line-for-line match, including indentation.\n" +
   "5. Keep the SEARCH blocks reasonably short (a few lines of context) but unique enough to find the correct location.\n\n" +
   "Example Output Format:\n" +
+  "Brief summary of changes here...\n\n" +
   "```text\n" +
   "src/App.tsx\n" +
   "<<<<<<< SEARCH\n" +
@@ -22,8 +23,8 @@ const DEFAULT_EDIT_PROMPT = "Read the attached context.xml, understand the conte
   "    const [activeTab, setActiveTab] = useState(\"B\");\n" +
   ">>>>>>> REPLACE\n" +
   "```\n\n" +
-  "5. ONLY if you determine that necessary files are missing from context.xml, do NOT output the code modification block. Instead, output the missing file paths in a single code block and ask the user to add them.\n" +
-  "6. If your changes are massive and might hit the output token limit, finish the current file's REPLACE block cleanly, close the code block, and ask the user to say 'continue' for the rest.";
+  "6. ONLY if you determine that necessary files are missing from context.xml, do NOT output the code modification block. Instead, output the missing file paths in a single code block and ask the user to add them.\n" +
+  "7. If your changes are massive and might hit the output token limit, finish the current file's REPLACE block cleanly, close the code block, and ask the user to say 'continue' for the rest.";
 
 const DEFAULT_ASK_PROMPT = "Read the attached context.xml, understand the repository context, and answer the following question.\n\n=== Question ===\n{instruction}\n==============\n\n[IMPORTANT]\nIf you determine that necessary files are missing from context.xml to answer the question, please tell the user which files are missing. Output the missing file paths in a single markdown code block (so the user can easily copy them), and ask the user to add them to the 'Target Files' input and run again.";
 
@@ -68,7 +69,6 @@ function App() {
   const [maxFileSizeKb, setMaxFileSizeKb] = useState("80");
   const [packedFiles, setPackedFiles] = useState<{path: string, size_kb: number}[]>([]);
   const [aiResponse, setAiResponse] = useState("");
-  const [commitMessage, setCommitMessage] = useState("");
   const [patchStatus, setPatchStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [logs, setLogs] = useState<string[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -241,17 +241,7 @@ function App() {
     setTargetFiles([]);
     setPackedFiles([]);
     setAiResponse("");
-    setCommitMessage("");
     setPatchStatus('idle');
-  };
-
-  const handleAiResponseChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    const val = e.target.value;
-    setAiResponse(val);
-    const summaryMatch = val.match(/<summary>([\s\S]*?)<\/summary>/);
-    if (summaryMatch && summaryMatch[1]) {
-      setCommitMessage(summaryMatch[1].trim());
-    }
   };
 
   const handleApplyPatch = async () => {
@@ -639,19 +629,10 @@ function App() {
                     </div>
                   )}
                   <div className="form-group">
-                      <label>Commit Message (Summary)</label>
-                      <textarea 
-                        value={commitMessage} 
-                        onChange={(e) => setCommitMessage(e.target.value)} 
-                        placeholder="Briefly summarize your changes..."
-                        style={{ height: '80px', minHeight: '80px' }}
-                      />
-                  </div>
-                  <div className="form-group">
                       <label>AI Response (SEARCH/REPLACE Blocks)</label>
                       <textarea 
                         value={aiResponse} 
-                        onChange={handleAiResponseChange} 
+                        onChange={(e) => setAiResponse(e.target.value)} 
                         placeholder="Paste the full response from your Web LLM here..."
                       />
                   </div>
