@@ -491,8 +491,7 @@ function App() {
                       </div>
                   )}
               </div>
-              );
-            })()}
+            )}
             
             {activeTab === 'B' && (() => {
               const words = fileInput.split(' ');
@@ -623,7 +622,8 @@ function App() {
                     </div>
                   )}
               </div>
-            )}
+              );
+            })()}
             
             {activeTab === 'C' && (
               <div className="card">
