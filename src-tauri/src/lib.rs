@@ -424,6 +424,7 @@ pub fn run() {
             reset_aider_state,
             apply_patch,
             api::pack_target_files,
+            api::get_directory_files,
             api::load_config,
             api::save_config,
             api::open_config_dir

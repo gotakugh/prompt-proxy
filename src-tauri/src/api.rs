@@ -493,3 +493,26 @@ pub async fn open_config_dir() -> Result<(), String> {
     }
     Ok(())
 }
+
+#[tauri::command]
+pub async fn get_directory_files(target_dir: String) -> Result<Vec<String>, String> {
+    let mut files = Vec::new();
+    if target_dir.trim().is_empty() {
+        return Ok(files);
+    }
+    let walker = ignore::WalkBuilder::new(&target_dir)
+        .hidden(false)
+        .git_ignore(true)
+        .build();
+    let target_path = std::path::Path::new(&target_dir);
+    for result in walker {
+        if let Ok(entry) = result {
+            if entry.file_type().map_or(false, |ft| ft.is_file()) {
+                if let Ok(rel_path) = entry.path().strip_prefix(target_path) {
+                    files.push(rel_path.to_string_lossy().replace("\\", "/"));
+                }
+            }
+        }
+    }
+    Ok(files)
+}

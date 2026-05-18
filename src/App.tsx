@@ -95,6 +95,7 @@ function App() {
   }, [logs]);
 
   const isInitialLoad = useRef(true);
+  const isPatchingRef = useRef(false);
 
   // Load config from file on mount
   useEffect(() => {
@@ -179,7 +180,10 @@ function App() {
 
     const unlistenFinished = listen<boolean>("aider_finished", (event) => {
       setIsProcessing(false);
-      setPatchStatus(event.payload ? 'success' : 'error');
+      if (isPatchingRef.current) {
+        setPatchStatus(event.payload ? 'success' : 'error');
+        isPatchingRef.current = false;
+      }
     });
 
     return () => {
@@ -252,6 +256,7 @@ function App() {
   const handleApplyPatch = async () => {
     setPatchStatus('idle');
     setIsProcessing(true);
+    isPatchingRef.current = true;
     setLogs(prev => [...prev, `--- PromptProxy: Applying patch via Aider [${new Date().toLocaleTimeString()}] ---`]);
     await invoke("apply_patch", {
       targetDir,
