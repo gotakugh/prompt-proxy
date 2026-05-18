@@ -54,6 +54,7 @@ function App() {
   const [targetFiles, setTargetFiles] = useState<{path: string, included: boolean}[]>([]);
   const [fileInput, setFileInput] = useState("");
   const [fileSuggestions, setFileSuggestions] = useState<string[]>([]);
+  const [suggestIndex, setSuggestIndex] = useState(-1);
   const [instruction, setInstruction] = useState("");
   const [fileEncoding, setFileEncoding] = useState("");
   const [mapTokens, setMapTokens] = useState("");
@@ -266,6 +267,12 @@ function App() {
       gitPath
     });
     setAiResponse(""); // Clear response after applying
+  };
+
+  const handleCopyErrorLogs = () => {
+    const patchStartIndex = logs.findLastIndex(l => l.includes('Applying patch via Aider'));
+    const relevantLogs = patchStartIndex >= 0 ? logs.slice(patchStartIndex) : logs;
+    navigator.clipboard.writeText(relevantLogs.join('\n'));
   };
 
   const handlePackFiles = async () => {
@@ -484,34 +491,73 @@ function App() {
                       </div>
                   )}
               </div>
-            )}
+              );
+            })()}
             
-            {activeTab === 'B' && (
+            {activeTab === 'B' && (() => {
+              const words = fileInput.split(' ');
+              const currentWord = words[words.length - 1];
+              const activeSuggestions = (currentWord && currentWord.length > 0) ? fileSuggestions.filter(s => s.toLowerCase().includes(currentWord.toLowerCase())).slice(0, 10) : [];
+
+              return (
               <div className="card">
                   <div className="form-group">
                       <label>Add Target Files (Space-separated, Press Enter)</label>
-                      <div className="input-group">
+                      <div className="input-group" style={{ position: 'relative' }}>
                         <input
                           type="text"
                           value={fileInput}
-                          onChange={(e) => setFileInput(e.target.value)}
+                          onChange={(e) => {
+                            setFileInput(e.target.value);
+                            setSuggestIndex(-1);
+                          }}
                           onKeyDown={(e) => {
-                            if (e.key === "Enter" && fileInput.trim()) {
-                              const newPaths = fileInput.split(/\s+/).filter(p => p && !targetFiles.some(tf => tf.path === p));
-                              if (newPaths.length > 0) {
-                                setTargetFiles([...targetFiles, ...newPaths.map(p => ({ path: p, included: true }))]);
+                            if (e.key === "ArrowDown" && activeSuggestions.length > 0) {
+                              setSuggestIndex(prev => Math.min(prev + 1, activeSuggestions.length - 1));
+                              e.preventDefault();
+                            } else if (e.key === "ArrowUp" && activeSuggestions.length > 0) {
+                              setSuggestIndex(prev => Math.max(prev - 1, 0));
+                              e.preventDefault();
+                            } else if (e.key === "Enter") {
+                              if (activeSuggestions.length > 0 && suggestIndex >= 0) {
+                                const newWords = [...words];
+                                newWords[newWords.length - 1] = activeSuggestions[suggestIndex];
+                                setFileInput(newWords.join(' ') + ' ');
+                                setSuggestIndex(-1);
+                                e.preventDefault();
+                              } else if (fileInput.trim()) {
+                                const newPaths = fileInput.split(/\s+/).filter(p => p && !targetFiles.some(tf => tf.path === p));
+                                if (newPaths.length > 0) {
+                                  setTargetFiles([...targetFiles, ...newPaths.map(p => ({ path: p, included: true }))]);
+                                }
+                                setFileInput("");
+                                setSuggestIndex(-1);
                               }
-                              setFileInput("");
                             }
                           }}
                           placeholder="src/main.rs src/lib.rs"
-                          list="file-suggestions"
                         />
                         <button onClick={() => setTargetFiles([])} className="reset-button">Clear All</button>
+
+                        {activeSuggestions.length > 0 && (
+                          <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, backgroundColor: 'white', border: '1px solid #ccc', zIndex: 10, maxHeight: '150px', overflowY: 'auto', borderRadius: '4px', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }}>
+                            {activeSuggestions.map((s, i) => (
+                              <div
+                                key={i}
+                                onClick={() => {
+                                  const newWords = [...words];
+                                  newWords[newWords.length - 1] = s;
+                                  setFileInput(newWords.join(' ') + ' ');
+                                  setSuggestIndex(-1);
+                                }}
+                                style={{ padding: '0.4em 0.8em', cursor: 'pointer', borderBottom: '1px solid #eee', color: '#333', backgroundColor: i === suggestIndex ? '#e8f0fe' : 'transparent' }}
+                              >
+                                {s}
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
-                      <datalist id="file-suggestions">
-                        {fileSuggestions.map((s, i) => <option key={i} value={s} />)}
-                      </datalist>
                   </div>
 
                   <div style={{ maxHeight: '200px', overflowY: 'auto', marginBottom: '1em', border: '1px solid #ccc', borderRadius: '6px', padding: '0.5em', backgroundColor: 'rgba(0,0,0,0.02)' }}>
@@ -589,6 +635,7 @@ function App() {
                   {patchStatus === 'error' && (
                     <div style={{ padding: '0.8em', marginBottom: '1em', borderRadius: '6px', backgroundColor: '#f8d7da', color: '#721c24', border: '1px solid #f5c6cb' }}>
                       ❌ Patch application failed or partially failed. Check logs.
+                      <button onClick={handleCopyErrorLogs} style={{ marginLeft: '1em', padding: '0.2em 0.8em', fontSize: '0.85em', backgroundColor: '#fff', color: '#721c24', border: '1px solid #721c24' }}>📋 Copy Error Logs for AI</button>
                     </div>
                   )}
                   <div className="form-group">
